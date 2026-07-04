@@ -6,7 +6,7 @@
 - #3: **jaahas/crow:9b** (2.73, new)
 - Anchor fallback: **qwen3.5:4b** (2.19, universal — last in chain, always works)
 - Old winners superseded: `MobiusDevelopment/gemma-4-12B-it-qat` (couldn't load during bench — VRAM contention, blob valid), `batiai/gemma4-12b:q4` (quant-loser, was stale default).
-- Bench source: `/home/ellama/bench/ollama/RANKING.md` + `deep_bench.py` (5 tasks × 2 prompts; improve/codeq_sum/smart_trim/web_synth/code_gen).
+- Bench source: `/home/eldi/bench/ollama/RANKING.md` + `deep_bench.py` (5 tasks × 2 prompts; improve/codeq_sum/smart_trim/web_synth/code_gen). The real-pipeline improve bench is `bench_improve_real.py` (runs models through the ACTUAL `build_rewrite_system_prompt` + `clean_rewrite`; source of truth for routing — deep_bench's own scoring missed the `<|channel>` leak and false-ranked Huihui).
 
 ### Caveat: deep_bench leak-detector gap
 `deep_bench.score()` only flags `<think>`/`thinking process`/refusals — NOT `<|channel>`. So Huihui false-ranked #1 until validated through the real hook pipeline. Any new bench MUST run outputs through `prompt_improve.features.clean.clean_rewrite` to catch leaks deep_bench misses.
