@@ -24,13 +24,26 @@ OLLAMA_PID = os.path.expanduser("~/.ollama/ollama-serve.pid")
 # ---------------------------------------------------------------------------
 # Model candidates (global fallback)
 # ---------------------------------------------------------------------------
+# Default chain = deep_bench improve winners 2026-07-04 (validated through the
+# real clean_rewrite pipeline). Ordered by score: Huihui-abliterated (4.5, leaks
+# <|channel> tokens stripped at ollama_client source) → Qwopus3.5:9b (2.91) →
+# crow:9b (2.73) → qwen3.5:4b (2.19, universal anchor). The full available-model
+# tail is appended at runtime by choose_ollama_model_for_role, so this is
+# prioritization, not a hard dependency — missing models degrade gracefully.
+_DEFAULT_IMPROVE_CHAIN = (
+    "hf.co/mradermacher/Huihui-gemma-4-12B-it-qat-q4_0-unquantized-abliterated-GGUF:Q4_K_M,"
+    "fredrezones55/Qwopus3.5:9b,"
+    "jaahas/crow:9b,"
+    "qwen3.5:4b"
+)
+
 OLLAMA_MODEL_CANDIDATES = [
     m.strip()
     for m in os.environ.get(
         "OLLAMA_IMPROVE_MODELS",
         os.environ.get(
             "OLLAMA_IMPROVE_MODEL",
-            "batiai/gemma4-12b:q4,qwen3.5:4b",
+            _DEFAULT_IMPROVE_CHAIN,
         ),
     ).split(",")
     if m.strip()
@@ -41,8 +54,8 @@ OLLAMA_MODEL_CANDIDATES = [
 # ---------------------------------------------------------------------------
 _ROLE_MODEL_MAP: dict[str, list[str]] = {}
 for _role, _default in [
-    ("prompt_rewrite", "batiai/gemma4-12b:q4,qwen3.5:4b"),
-    ("prompt_clarify", "batiai/gemma4-12b:q4,qwen3.5:4b"),
+    ("prompt_rewrite", _DEFAULT_IMPROVE_CHAIN),
+    ("prompt_clarify", _DEFAULT_IMPROVE_CHAIN),
 ]:
     _env_key = f"OLLAMA_IMPROVE_ROLE_{_role.upper()}"
     _ROLE_MODEL_MAP[_role] = [

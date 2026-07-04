@@ -19,5 +19,12 @@ htmlcov/
 # Local Claude Code harness artifacts (auto-setup marker, orchestrator registry)
 .claude/
 
+# Orchestration registry churn — auto-regenerated each session by the
+# cross-CLI coordination layer; stays on disk for all CLIs to read, but is
+# not source of truth (perpetual dirty-tree noise if tracked).
+.memory-bank/agent-sessions.md
+.memory-bank/topics/agent-sessions.md
+.memory-bank/topics/foreign-sessions.md
+
 # uv lockfile — hook/package, not a deployable app
 uv.lock

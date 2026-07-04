@@ -13,6 +13,7 @@ Covers the 2026-06-25 fixes:
 Pure-function tests run offline. The ollama smoke test is skipped when no daemon
 is reachable. Run: `python3 -m pytest tests/ -q`
 """
+
 from __future__ import annotations
 
 import importlib.util
@@ -31,6 +32,7 @@ EVALS = Path(__file__).resolve().parent.parent / "evals" / "prompt-improve.json"
 def _load_hook():
     """Load a fresh instance of the improve module for monkeypatching."""
     import prompt_improve.features.improve as mod
+
     importlib.reload(mod)
     return mod
 
@@ -38,21 +40,57 @@ def _load_hook():
 # ---- P0: detect_trivial ----------------------------------------------------
 
 TRIVIAL_TRUE = [
-    "", "ok", "ok thanks", "vale listo", "got it", "yes", "no", "yep",
-    "hi", "hello", "hola", "hey", "bye", "chao",
-    "/commit", "/review", "/compact", "/status",
-    "a", "ab",
+    "",
+    "ok",
+    "ok thanks",
+    "vale listo",
+    "got it",
+    "yes",
+    "no",
+    "yep",
+    "hi",
+    "hello",
+    "hola",
+    "hey",
+    "bye",
+    "chao",
+    "/commit",
+    "/review",
+    "/compact",
+    "/status",
+    "a",
+    "ab",
 ]
 
 # Real short task prompts that MUST NOT be silenced (the 2026-06-25 bug set + more).
 TRIVIAL_FALSE = [
-    "debug the auth", "review the PR", "explain the function", "show me the code",
-    "write a test", "update the docs", "optimize this loop", "find the bug",
-    "add logging", "document the API", "read the config", "clean it up",
-    "explica esto", "revisa el login", "fix it", "fix the bug",
-    "mejora el rendimiento", "add tests", "genera el reporte", "valida el input",
-    "migrate the db", "lint the project", "profile this route", "scan for secrets",
-    "continua", "continua por favor", "continue where you left off",
+    "debug the auth",
+    "review the PR",
+    "explain the function",
+    "show me the code",
+    "write a test",
+    "update the docs",
+    "optimize this loop",
+    "find the bug",
+    "add logging",
+    "document the API",
+    "read the config",
+    "clean it up",
+    "explica esto",
+    "revisa el login",
+    "fix it",
+    "fix the bug",
+    "mejora el rendimiento",
+    "add tests",
+    "genera el reporte",
+    "valida el input",
+    "migrate the db",
+    "lint the project",
+    "profile this route",
+    "scan for secrets",
+    "continua",
+    "continua por favor",
+    "continue where you left off",
 ]
 
 
@@ -67,6 +105,7 @@ def test_detect_trivial_real_tasks_not_silenced():
 
 
 # ---- P1: language-aware rewrite labels -------------------------------------
+
 
 def test_rewrite_prompt_english_labels():
     prompt = ip.build_rewrite_system_prompt("English")
@@ -93,6 +132,7 @@ def test_rewrite_prompt_forbids_user_questions_and_absolutes():
 
 # ---- P2: soften invented absolutes -----------------------------------------
 
+
 def test_soften_absolutes_english():
     assert "100% coverage" not in ip._soften_invented_absolutes("Ensure 100% coverage")
     assert "zero downtime" not in ip._soften_invented_absolutes("zero downtime guaranteed")
@@ -106,6 +146,7 @@ def test_soften_absolutes_spanish():
 
 
 # ---- P3: _clean_rewrite strips question-loop + softens absolutes -----------
+
 
 def test_clean_rewrite_strips_validation_questions_section():
     raw = (
@@ -135,6 +176,7 @@ def test_clean_rewrite_softens_absolute_in_output():
 
 # ---- Fast-path: concrete target --------------------------------------------
 
+
 def test_has_concrete_target_true():
     assert ip.has_concrete_target("fix the bug in src/auth/login.py")
     assert ip.has_concrete_target("update the config.yaml timeouts")
@@ -150,6 +192,7 @@ def test_has_concrete_target_false_for_vague():
 
 
 # ---- P4: project hint ------------------------------------------------------
+
 
 def test_project_hint_empty_when_no_cwd():
     assert ip._project_hint(None) == ""
@@ -375,9 +418,7 @@ def test_prompt_cache_key_is_project_scoped():
     with tempfile.TemporaryDirectory() as a, tempfile.TemporaryDirectory() as b:
         (Path(a) / ".memory-bank").mkdir()
         (Path(b) / ".memory-bank").mkdir()
-        assert ip._cache_key("continua", "rewrite", a) != ip._cache_key(
-            "continua", "rewrite", b
-        )
+        assert ip._cache_key("continua", "rewrite", a) != ip._cache_key("continua", "rewrite", b)
 
 
 def test_prompt_cache_key_changes_when_memory_context_changes():
@@ -405,10 +446,11 @@ def test_prompt_cache_key_changes_when_memory_context_changes():
 
 # ---- decide_mode -----------------------------------------------------------
 
+
 def test_decide_mode_threshold():
     # Force "auto" mode
     os.environ.pop("OLLAMA_IMPROVE_MODE", None)
-    assert ip.decide_mode("fix it") == "rewrite"          # short
+    assert ip.decide_mode("fix it") == "rewrite"  # short
     assert ip.decide_mode("x" * ip.REWRITE_THRESHOLD) == "clarify"  # long
 
 
@@ -422,6 +464,7 @@ def test_decide_mode_explicit_override():
 
 # ---- data-driven eval fixtures ---------------------------------------------
 
+
 def test_eval_fixture_properties():
     """Consume evals/prompt-improve.json and assert each declared property."""
     if not EVALS.exists():
@@ -433,12 +476,17 @@ def test_eval_fixture_properties():
         if "expect_trivial" in case:
             assert ip.detect_trivial(prompt) is case["expect_trivial"], f"[{cid}] trivial mismatch"
         if case.get("expect_concrete_target") is not None:
-            assert ip.has_concrete_target(prompt) is case["expect_concrete_target"], f"[{cid}] concrete mismatch"
+            assert ip.has_concrete_target(prompt) is case["expect_concrete_target"], (
+                f"[{cid}] concrete mismatch"
+            )
         if "expect_language" in case:
-            assert ip.detect_language(prompt) == case["expect_language"], f"[{cid}] language mismatch"
+            assert ip.detect_language(prompt) == case["expect_language"], (
+                f"[{cid}] language mismatch"
+            )
 
 
 # ---- real ollama smoke (skipped if no daemon) ------------------------------
+
 
 def _ollama_available() -> bool:
     try:
@@ -452,8 +500,10 @@ def test_smoke_rewrite_no_es_leak_no_question_loop():
     section headers, must not end with validation questions, and must not
     invent '100% coverage'. Skipped when ollama is unavailable."""
     import prompt_improve.shared.cache as cache_mod
+
     if not _ollama_available():
         import pytest
+
         pytest.skip("ollama not available")
     orig_ttl = cache_mod.CACHE_TTL_SECONDS
     cache_mod.CACHE_TTL_SECONDS = 0.0
@@ -463,6 +513,7 @@ def test_smoke_rewrite_no_es_leak_no_question_loop():
         cache_mod.CACHE_TTL_SECONDS = orig_ttl
     if result is None:
         import pytest
+
         pytest.skip("ollama returned no output")
     text = result[0]
     assert "Contexto:" not in text and "Objetivo:" not in text
@@ -472,6 +523,7 @@ def test_smoke_rewrite_no_es_leak_no_question_loop():
 
 
 # ---- intelligent router: hard prompts -> cloud (Ling), simple -> local --------
+
 
 def test_needs_cloud_hard_domains():
     """Prompts in hard domains (security/concurrency/distributed/architecture/
@@ -493,8 +545,13 @@ def test_needs_cloud_hard_domains():
 def test_needs_cloud_simple_stays_local():
     """Simple prompts the local model handles well must NOT escalate."""
     simple = [
-        "fix the bug", "add tests", "review the PR", "update the docs",
-        "explain the function", "fix the bug in src/app.py", "mejora el rendimiento",
+        "fix the bug",
+        "add tests",
+        "review the PR",
+        "update the docs",
+        "explain the function",
+        "fix the bug in src/app.py",
+        "mejora el rendimiento",
     ]
     for p in simple:
         assert ip.needs_cloud_intelligence(p, "rewrite") is False, f"should stay local: {p!r}"
@@ -513,6 +570,7 @@ def test_route_hard_prompt_prefers_cloud():
     """When needs_cloud_intelligence is True, the cloud cascade is called and local
     is NOT (the bigger model handles it)."""
     import prompt_improve.features.improve as m
+
     calls = {"cloud": 0, "local": 0}
     captured = {}
     orig_needs = m.needs_cloud_intelligence
@@ -547,6 +605,7 @@ def test_route_simple_prompt_prefers_local():
     """When needs_cloud_intelligence is False, local is tried first; cloud only if
     local is unavailable."""
     import prompt_improve.features.improve as m
+
     orig_needs = m.needs_cloud_intelligence
     orig_cloud = m.call_cloud_cascade
     orig_local = m.call_ollama_rewrite
@@ -577,6 +636,7 @@ def test_route_simple_prompt_prefers_local():
 def test_route_local_down_falls_back_to_cloud():
     """Simple prompt + local unavailable -> cloud availability fallback fires."""
     import prompt_improve.features.improve as m
+
     orig_needs = m.needs_cloud_intelligence
     orig_cloud = m.call_cloud_cascade
     orig_local = m.call_ollama_rewrite
@@ -601,10 +661,12 @@ def test_route_local_down_falls_back_to_cloud():
 
 # ---- cloud fallback (cheap_llm cascade: ling-2.6-flash/1t, gemini) ----------
 
+
 def test_cloud_cascade_env_opt_out():
     """OLLAMA_IMPROVE_CLOUD_FALLBACK=0 must short-circuit to None (no cloud call)."""
     import prompt_improve.features.improve as imod
     import prompt_improve.shared.config as cfg
+
     orig = cfg.CLOUD_FALLBACK
     cfg.CLOUD_FALLBACK = False
     imod.CLOUD_FALLBACK = False
@@ -622,12 +684,15 @@ def test_cloud_cascade_postprocesses_output():
 
     import prompt_improve.features.improve as imod
     import prompt_improve.shared.config as cfg
+
     stub = _types.ModuleType("cheap_llm")
 
     def fake_complete(**_):
         return {
-            "text": ("Fix the bug.\n\nAcceptance criteria: 100% coverage.\n\n"
-                     "Preguntas de validación:\n1. which file?"),
+            "text": (
+                "Fix the bug.\n\nAcceptance criteria: 100% coverage.\n\n"
+                "Preguntas de validación:\n1. which file?"
+            ),
             "model": "ling-2.6-flash",
             "tier": "T2",
         }
@@ -658,17 +723,20 @@ def test_cloud_cascade_postprocesses_output():
 def test_smoke_cloud_cascade_live():
     """Live cloud cascade smoke. Skipped without cheap_llm or OPENROUTER_API_KEY."""
     import prompt_improve.features.improve as imod
+
     try:
         import cheap_llm  # type: ignore[import-not-found]  # noqa: F401
     except Exception:
         try:
             import pytest
+
             pytest.skip("cheap_llm not importable")
         except ImportError:
             return
     if not os.environ.get("OPENROUTER_API_KEY"):
         try:
             import pytest
+
             pytest.skip("no OPENROUTER_API_KEY")
         except ImportError:
             return
@@ -676,6 +744,7 @@ def test_smoke_cloud_cascade_live():
     if result is None:
         try:
             import pytest
+
             pytest.skip("cloud cascade unavailable")
         except ImportError:
             return
@@ -700,7 +769,9 @@ def test_role_model_map_prefers_gemma4():
     for role in ("prompt_rewrite", "prompt_clarify"):
         candidates = ip._ROLE_MODEL_MAP[role]
         assert len(candidates) >= 2, f"{role} should have at least 2 candidates"
-        assert "gemma" in candidates[0].lower(), f"{role} should prefer gemma4 first, got {candidates[0]}"
+        assert "gemma" in candidates[0].lower(), (
+            f"{role} should prefer gemma4 first, got {candidates[0]}"
+        )
 
 
 def test_role_model_map_no_hauhaucs():
@@ -713,11 +784,11 @@ def test_role_model_map_no_hauhaucs():
 def test_default_candidates_no_hauhaucs():
     """OLLAMA_MODEL_CANDIDATES default no longer includes HauhauCS."""
     import prompt_improve.shared.config as cfg
+
     src = Path(cfg.__file__).read_text()
     import re
-    match = re.search(
-        r'OLLAMA_IMPROVE_MODEL["\']?,\s*\n\s*"(.*?)"', src, re.DOTALL
-    )
+
+    match = re.search(r'OLLAMA_IMPROVE_MODEL["\']?,\s*\n\s*"(.*?)"', src, re.DOTALL)
     if match:
         default_value = match.group(1)
         assert "HauhauCS" not in default_value, (
@@ -728,6 +799,7 @@ def test_default_candidates_no_hauhaucs():
 def test_choose_model_for_role_returns_none_without_ollama():
     """choose_ollama_model_for_role returns (None, []) when Ollama is unavailable."""
     import prompt_improve.shared.ollama as omod
+
     orig = omod.available_ollama_models
     omod.available_ollama_models = lambda: []
     orig_start = omod.start_ollama_best_effort
@@ -742,19 +814,22 @@ def test_choose_model_for_role_returns_none_without_ollama():
 
 
 def test_choose_model_for_role_prefers_role_candidate():
-    """When role candidate is available, it's chosen as primary."""
+    """When a non-tail role candidate is available, it's chosen as primary over
+    the universal qwen3.5:4b anchor (which sits last in the chain)."""
     import prompt_improve.shared.ollama as omod
+
     orig = omod.available_ollama_models
     omod.available_ollama_models = lambda: [
         "qwen3.5:4b",
-        "batiai/gemma4-12b:q4",
+        "fredrezones55/Qwopus3.5:9b",
     ]
     orig_start = omod.start_ollama_best_effort
     omod.start_ollama_best_effort = lambda: True
     try:
         primary, fallbacks = omod.choose_ollama_model_for_role("prompt_rewrite")
         assert primary is not None
-        assert "gemma" in primary.lower()
+        # Qwopus3.5:9b is ahead of qwen3.5:4b in the role chain → must win
+        assert "qwopus" in primary.lower()
         assert len(fallbacks) >= 1
     finally:
         omod.available_ollama_models = orig
@@ -764,6 +839,7 @@ def test_choose_model_for_role_prefers_role_candidate():
 def test_choose_model_for_role_falls_back_when_primary_unavailable():
     """When gemma4 is unavailable, qwen3.5:4b is chosen."""
     import prompt_improve.shared.ollama as omod
+
     orig = omod.available_ollama_models
     omod.available_ollama_models = lambda: ["qwen3.5:4b", "some-other-model"]
     orig_start = omod.start_ollama_best_effort
@@ -780,6 +856,7 @@ def test_choose_model_for_role_env_override():
     """OLLAMA_IMPROVE_ROLE_PROMPT_REWRITE env var overrides the default."""
     import prompt_improve.shared.config as cfg
     import prompt_improve.shared.ollama as omod
+
     orig_env = os.environ.get("OLLAMA_IMPROVE_ROLE_PROMPT_REWRITE")
     orig_models = omod.available_ollama_models
     omod.available_ollama_models = lambda: ["custom-model:latest", "qwen3.5:4b"]
@@ -803,6 +880,7 @@ def test_choose_model_for_role_env_override():
 
 
 # ---- clean module: direct unit tests ----------------------------------------
+
 
 def test_trim_bullet_short_line_unchanged():
     assert ip._trim_bullet("short line") == "short line"
@@ -895,7 +973,140 @@ def test_clean_rewrite_strips_preamble():
     assert "Fix the authentication" in result
 
 
+# ---- fallback chain: OllamaRequestError vs OllamaUnavailable ---------------
+# Regression for the model-load-failure bug: a primary that fails to LOAD
+# (HTTP 500 — common under VRAM contention with many models installed) must
+# NOT abort the whole fallback chain. Only a daemon-down (URLError/timeout)
+# aborts. These tests are fixture-free so they run under both pytest and _run_all().
+
+_FAKE_REWRITE = (
+    "Goal: fix the dashboard load performance.\n\n"
+    "Steps:\n"
+    "- Profile the initial render with browser devtools to find the slow components.\n"
+    "- Add lazy loading for the chart components below the fold.\n"
+    "- Memoize the expensive selectors.\n\n"
+    "Verify: the dashboard paints in under one second on a cold load."
+)
+
+
+def _seq_responder(seq):
+    """Build a callable yielding items from ``seq`` in order. Strings are
+    returned as chat content; BaseException instances are RAISED (so a model
+    that fails to load or is unreachable can be expressed in the same sequence
+    as a model that returns content)."""
+    it = iter(seq)
+
+    def _respond():
+        item = next(it)
+        if isinstance(item, BaseException):
+            raise item
+        return item
+
+    return _respond
+
+
+def _patch_runner():
+    """Install a fake ollama_client + controlled model picker on the loaded module.
+
+    Returns (mod, calls_list, fake_chat, saved). Caller restores in finally.
+    """
+    import types
+
+    mod = _load_hook()
+
+    # Stand-in exception classes — the except clauses match by object identity,
+    # so these need not be the real ollama_client classes (keeps the test offline
+    # and independent of whether the daemon/scripts are present).
+    class _ReqErr(Exception):
+        pass
+
+    class _Unavail(Exception):
+        pass
+
+    calls: list[str] = []
+
+    def fake_chat(messages, **kw):  # noqa: ANN001
+        calls.append(kw.get("model") or "")
+        return fake_chat._next()  # type: ignore[attr-defined]
+
+    fake_oc = types.SimpleNamespace(
+        chat=fake_chat,
+        OllamaRequestError=_ReqErr,
+        OllamaUnavailable=_Unavail,
+    )
+
+    saved = {
+        "oc": mod.compat.ollama_client,
+        "pick": mod.choose_ollama_model_for_role,
+        "load": mod.load_cached,
+        "save": mod.save_cached,
+    }
+    mod.compat.ollama_client = fake_oc
+    mod.choose_ollama_model_for_role = lambda role: ("primary_model", ["fallback_model"])
+    mod.load_cached = lambda *a, **k: None
+    mod.save_cached = lambda *a, **k: None
+    return mod, calls, saved, _ReqErr, _Unavail, fake_chat
+
+
+def _restore(mod, saved):
+    mod.compat.ollama_client = saved["oc"]
+    mod.choose_ollama_model_for_role = saved["pick"]
+    mod.load_cached = saved["load"]
+    mod.save_cached = saved["save"]
+
+
+def test_fallback_chain_continues_past_model_load_failure():
+    """Primary raises OllamaRequestError (HTTP 500 / VRAM load failure) → the
+    chain MUST advance to the fallback and succeed, not abort."""
+    mod, calls, saved, ReqErr, _Unavail, fake_chat = _patch_runner()
+    fake_chat._next = _seq_responder([ReqErr("HTTP 500: unable to load model"), _FAKE_REWRITE])
+    try:
+        result = mod.call_ollama_rewrite("haz el dashboard mas rapido", cwd=None)
+    finally:
+        _restore(mod, saved)
+    # Both models were attempted (primary failed, fallback succeeded)
+    assert calls == ["primary_model", "fallback_model"], f"chain aborted early: {calls}"
+    assert result is not None, "fallback produced no result"
+    text, source = result
+    assert source == "ollama:fallback_model"
+    assert "dashboard" in text.lower()
+
+
+def test_fallback_chain_aborts_on_daemon_down():
+    """OllamaUnavailable (daemon unreachable) → abort the whole chain; do NOT
+    burn time trying further models against a down daemon."""
+    mod, calls, saved, _ReqErr, Unavail, fake_chat = _patch_runner()
+    fake_chat._next = _seq_responder([Unavail("connection refused")])
+    try:
+        result = mod.call_ollama_rewrite("haz el dashboard mas rapido", cwd=None)
+    finally:
+        _restore(mod, saved)
+    assert result is None, "daemon-down should yield None, not a fallback attempt"
+    # Only the primary was tried — the chain aborted immediately
+    assert calls == ["primary_model"], f"chain did not abort on daemon-down: {calls}"
+
+
+def test_fallback_chain_skips_empty_then_succeeds():
+    """A model that returns empty (think-leak / no content) is skipped via
+    `if not content: continue` — distinct from a load failure."""
+    mod, calls, saved, _ReqErr, _Unavail, fake_chat = _patch_runner()
+    fake_chat._next = _seq_responder(["", "   ", _FAKE_REWRITE])
+    mod.choose_ollama_model_for_role = lambda role: (
+        "primary_model",
+        ["second_model", "third_model"],
+    )
+    try:
+        result = mod.call_ollama_rewrite("haz el dashboard mas rapido", cwd=None)
+    finally:
+        _restore(mod, saved)
+    assert result is not None
+    _, source = result
+    assert source == "ollama:third_model", f"empty models should be skipped: {source}"
+    assert calls == ["primary_model", "second_model", "third_model"]
+
+
 # ---- unittest fallback (run without pytest) --------------------------------
+
 
 def _run_all() -> int:
     fns = [v for k, v in sorted(globals().items()) if k.startswith("test_") and callable(v)]

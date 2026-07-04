@@ -50,6 +50,11 @@ def _run_ollama_models(
                 cache=False,
                 num_ctx=num_ctx,
             )
+        except compat.ollama_client.OllamaRequestError:
+            # Model-specific failure (load failure, OOM, 404) — VRAM contention
+            # makes this common with many models installed. Try the next fallback;
+            # do NOT abort the whole chain (only daemon-down does that).
+            continue
         except compat.ollama_client.OllamaUnavailable:
             return None
         if not content:
