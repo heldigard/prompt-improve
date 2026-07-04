@@ -15,7 +15,7 @@ OLLAMA_URL = os.environ.get(
     "OLLAMA_URL",
     getattr(compat.ollama_client, "DEFAULT_URL", "http://127.0.0.1:11434"),
 )
-OLLAMA_TIMEOUT = float(os.environ.get("OLLAMA_IMPROVE_TIMEOUT", "20.0"))
+OLLAMA_TIMEOUT = float(os.environ.get("OLLAMA_IMPROVE_TIMEOUT", "45.0"))
 OLLAMA_AUTOSTART = os.environ.get("OLLAMA_IMPROVE_AUTOSTART", "1") != "0"
 CLOUD_FALLBACK = os.environ.get("OLLAMA_IMPROVE_CLOUD_FALLBACK", "1") != "0"
 OLLAMA_LOG = os.path.expanduser("~/.ollama/logs/ollama-serve.log")
@@ -155,7 +155,10 @@ _ABSOLUTE_REPLACEMENTS = (
     (re.compile(r"(?i)\b100\s?%\s*(?:of\s+)?(?:test\s+)?coverage\b"), "broad test coverage"),
     (re.compile(r"(?i)\b100\s?%\s*de\s+cobertura\b"), "cobertura amplia de pruebas"),
     (re.compile(r"(?i)\b(?:full|complete|total)\s+(?:test\s+)?coverage\b"), "broad test coverage"),
-    (re.compile(r"(?i)\bcobertura(?:\s+de\s+pruebas)?\s+(?:completa|total)\b"), "cobertura amplia de pruebas"),
+    (
+        re.compile(r"(?i)\bcobertura(?:\s+de\s+pruebas)?\s+(?:completa|total)\b"),
+        "cobertura amplia de pruebas",
+    ),
     (re.compile(r"(?i)\bzero\s+downtime\b"), "minimized downtime"),
     (re.compile(r"(?i)\bcero\s+downtime\b"), "downtime minimizado"),
 )

@@ -35,7 +35,11 @@ def _run_ollama_models(
     primary, fallbacks = choose_ollama_model_for_role(role)
     if not primary:
         return None
-    models = [primary] + fallbacks
+    # Cap the chain (primary + 5 fallbacks) so a slow/hung daemon can't walk the
+    # full available-model tail (60+) — bounds worst-case latency before the
+    # cloud fallback kicks in. The role map's explicit candidates come first, so
+    # the cap rarely truncates a preferred model.
+    models = ([primary] + fallbacks)[:6]
     for index, model in enumerate(models):
         timeout = timeout_first if index == 0 else timeout_fallback
         try:
@@ -87,9 +91,17 @@ def call_ollama(prompt: str, cwd: str | None = None) -> tuple[str, str] | None:
         },
     ]
     return _run_ollama_models(
-        "prompt_clarify", messages, clean_response, prompt, "clarify", cwd,
-        temperature=0.15, num_predict=160, num_ctx=16384,
-        timeout_first=OLLAMA_TIMEOUT, timeout_fallback=min(OLLAMA_TIMEOUT, 8.0),
+        "prompt_clarify",
+        messages,
+        clean_response,
+        prompt,
+        "clarify",
+        cwd,
+        temperature=0.15,
+        num_predict=160,
+        num_ctx=16384,
+        timeout_first=OLLAMA_TIMEOUT,
+        timeout_fallback=min(OLLAMA_TIMEOUT, 30.0),
     )
 
 
@@ -112,14 +124,24 @@ def call_ollama_rewrite(prompt: str, cwd: str | None = None) -> tuple[str, str] 
         },
     ]
     return _run_ollama_models(
-        "prompt_rewrite", messages, clean_rewrite, prompt, "rewrite", cwd,
-        temperature=0.2, num_predict=600, num_ctx=8192,
-        timeout_first=OLLAMA_TIMEOUT, timeout_fallback=min(OLLAMA_TIMEOUT, 10.0),
+        "prompt_rewrite",
+        messages,
+        clean_rewrite,
+        prompt,
+        "rewrite",
+        cwd,
+        temperature=0.2,
+        num_predict=600,
+        num_ctx=8192,
+        timeout_first=OLLAMA_TIMEOUT,
+        timeout_fallback=min(OLLAMA_TIMEOUT, 30.0),
     )
 
 
 def call_cloud_cascade(
-    prompt: str, mode: str, cwd: str | None = None,
+    prompt: str,
+    mode: str,
+    cwd: str | None = None,
     cloud_model: str | None = None,
 ) -> tuple[str, str] | None:
     """Cloud via cheap_llm cascade (cross-provider failover)."""
@@ -144,9 +166,13 @@ def call_cloud_cascade(
         )
     try:
         result = compat.cheap_complete(
-            system=system, prompt=user, schema_hint=None,
+            system=system,
+            prompt=user,
+            schema_hint=None,
             timeout_total=45.0 if cloud_model else 15.0,
-            prefer_local=False, require_json=False, cloud_model=cloud_model,
+            prefer_local=False,
+            require_json=False,
+            cloud_model=cloud_model,
         )
     except Exception:
         return None
@@ -160,9 +186,7 @@ def call_cloud_cascade(
     return text, f"cloud:{model}"
 
 
-def route_and_improve(
-    prompt: str, mode: str, cwd: str | None
-) -> tuple[str, str] | None:
+def route_and_improve(prompt: str, mode: str, cwd: str | None) -> tuple[str, str] | None:
     """Intelligent model router: hard → cloud first, else local first; cloud as availability fallback."""
     if needs_cloud_intelligence(prompt, mode):
         result = call_cloud_cascade(prompt, mode, cwd, cloud_model="deepseek/deepseek-v4-flash")
