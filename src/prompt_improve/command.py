@@ -28,24 +28,30 @@ def _build_additional(improved: str, source: str, is_rewrite: bool) -> str:
     return f"[Mejora de prompt: {source}]\n\n{improved}"
 
 
-def _try_improve(prompt: str, mode: str, cwd: Optional[str]) -> tuple[Optional[str], str]:
-    """Try LLM improvement, then rule-based fallback. Returns (improved, source)."""
+def _try_improve(
+    prompt: str, mode: str, cwd: Optional[str]
+) -> tuple[Optional[str], str, str]:
+    """Try LLM improvement, then rule-based fallback.
+
+    Returns (improved, source, effective_mode). The effective_mode may differ
+    from the input mode when rewrite falls back to clarify.
+    """
     if mode == "rewrite":
         deterministic = continuation_context(prompt, cwd)
         if deterministic:
-            return deterministic, "memory:currentTask"
+            return deterministic, "memory:currentTask", "rewrite"
 
     result = route_and_improve(prompt, mode, cwd)
     if result:
-        return result
+        return result[0], result[1], mode
 
     if mode == "rewrite":
         result = route_and_improve(prompt, "clarify", cwd)
         if result:
-            return result
+            return result[0], result[1], "clarify"
 
     fallback = rule_based_suggestions(prompt)
-    return fallback, "fallback:rules"
+    return fallback, "fallback:rules", mode
 
 
 def main() -> None:
@@ -83,13 +89,13 @@ def main() -> None:
         _passthrough()
         return
 
-    improved, source = _try_improve(prompt, mode, cwd)
+    improved, source, effective_mode = _try_improve(prompt, mode, cwd)
 
     if not improved:
         _passthrough()
         return
 
-    is_rewrite = source.startswith("memory:") or mode == "rewrite"
+    is_rewrite = source.startswith("memory:") or effective_mode == "rewrite"
     additional = _build_additional(improved, source, is_rewrite)
     output = {
         "continue": True,

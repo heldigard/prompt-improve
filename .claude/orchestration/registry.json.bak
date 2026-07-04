@@ -1,7 +1,7 @@
 {
   "agents": {
     "main": {
-      "last_seen": 1783176875.961706,
+      "last_seen": 1783176897.5717275,
       "leased_paths": [
         "/home/eldi/prompt-improve/.gitignore",
         "/home/eldi/prompt-improve/pyproject.toml",
@@ -293,7 +293,7 @@
     },
     "eff123dc-ad8": {
       "acquired_at": 1783174511.6693609,
-      "expires_at": 1783175111.6693609,
+      "expires_at": 1783177497.5717275,
       "holder": "main",
       "lease_id": "eff123dc-ad8",
       "mode": "exclusive",

@@ -1,7 +1,7 @@
 {
   "agents": {
     "main": {
-      "last_seen": 1783176897.5717275,
+      "last_seen": 1783177232.5611193,
       "leased_paths": [
         "/home/eldi/prompt-improve/.gitignore",
         "/home/eldi/prompt-improve/pyproject.toml",
@@ -285,7 +285,7 @@
     },
     "db3378b7-679": {
       "acquired_at": 1783175337.939095,
-      "expires_at": 1783176300.7806304,
+      "expires_at": 1783177832.5611193,
       "holder": "main",
       "lease_id": "db3378b7-679",
       "mode": "exclusive",
