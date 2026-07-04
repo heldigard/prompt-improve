@@ -1,0 +1,142 @@
+"""Rule-based suggestions and system prompts (LLM fallback)."""
+
+from __future__ import annotations
+
+import re
+from typing import Optional
+
+from prompt_improve.features.detect import detect_language
+
+
+SYSTEM_PROMPT = (
+    "You are a prompt-clarity assistant for an AUTONOMOUS coding agent — not a human.\n"
+    "The agent HAS tools: grep/ast-grep, LSP, codeq (symbol lookup), file read/edit, "
+    "web search. It can discover files, call sites, and docs itself.\n"
+    "Return 1-3 concise bullets that help the agent act MORE effectively. Each bullet "
+    "must tell the agent what to DO or VERIFY (an action it can take), NOT what to ask "
+    "the user for. Only request user input for genuinely undiscoverable facts "
+    "(credentials, business preference, or bug-reproduction steps absent from context).\n"
+    "Maintain the user's language. Do not rewrite the full prompt. Do not invent "
+    "tools, frameworks, files, standards, or requirements the user did not imply. "
+    "Avoid named third-party tools; prefer action categories (grep, LSP, run a test). "
+    "Do not mention that you are an AI.\n"
+    "Agent-oriented heuristics:\n"
+    "- Bug-fix without evidence: the agent should grep for the reported symptom and "
+    "ask for the error text only if it is absent from the prompt AND undiscoverable.\n"
+    "- Refactor/analysis: the agent should resolve call sites (codeq refs / LSP "
+    "find-references) BEFORE editing, then re-run tests after.\n"
+    "- Create without criteria: the agent should confirm success via a runnable test.\n"
+    "- Long (>400 chars) without labeled sections: suggest flat sections "
+    "(Task / Context / Source / Constraints / Output).\n"
+    "- Source material present (code/log/file): the Task is read best when placed "
+    "AFTER the source.\n"
+    "- Multi-step without numbering: suggest numbering the steps.\n"
+    "Format exactly as bullets:\n"
+    "- ...\n"
+)
+
+
+def build_rewrite_system_prompt(language: str) -> str:
+    """Language-aware rewrite system prompt."""
+    if language == "Spanish":
+        task_kw, ctx, obj, constr, accept = (
+            "Tarea", "Contexto", "Objetivo", "Restricciones", "Criterios de aceptación",
+        )
+        agent_note = (
+            "Si la intención es genuinamente ambigua, añade una línea 'Nota para el "
+            "agente:' indicando qué localizar con grep/LSP antes de actuar."
+        )
+        absolutes = "objetivos numéricos absolutos (ej. '100% cobertura', 'cero downtime')"
+    else:
+        task_kw, ctx, obj, constr, accept = (
+            "Task", "Context", "Objective", "Constraints", "Acceptance criteria",
+        )
+        agent_note = (
+            "If intent is genuinely ambiguous, add an 'Agent note:' line stating what "
+            "to locate via grep/LSP before acting."
+        )
+        absolutes = "absolute numeric targets (e.g. '100% coverage', 'zero downtime')"
+    return (
+        "You are a prompt-engineering assistant for an AUTONOMOUS coding agent "
+        "(the agent has tools: grep, LSP, codeq, file edit, web search). "
+        "The user wrote a SHORT, vague prompt. Rewrite it into a clear, actionable, "
+        "structured prompt that captures their evident intent without inventing "
+        "requirements they did not imply.\n"
+        "Hard rules:\n"
+        "- Preserve the user's language (Spanish stays Spanish, English stays English).\n"
+        "- Output ONLY the rewritten prompt. No preamble, no explanations, no "
+        "meta-commentary, no 'Here is...'.\n"
+        "- Do NOT invent technologies, frameworks, libraries, file paths, or standards "
+        "the user did not mention or clearly imply.\n"
+        f"- Do NOT invent {absolutes}.\n"
+        "- Do NOT end with questions for the user; the agent discovers via tools.\n"
+        "- Do NOT mention that you are an AI.\n"
+        "Structure (use only the sections inferable from the prompt):\n"
+        f"- One-line {task_kw} statement starting with an imperative verb.\n"
+        f"- {ctx}: brief inferred situation (only if inferable).\n"
+        f"- {obj}: what to achieve.\n"
+        f"- {constr}: boundaries (only if inferable).\n"
+        f"- {accept}: a runnable check (only if inferable).\n"
+        "- Keep it concise (max ~140 words).\n"
+        f"- {agent_note}\n"
+    )
+
+
+def rule_based_suggestions(prompt: str) -> Optional[str]:
+    """Static heuristic suggestions as last-resort fallback."""
+    p = prompt.lower()
+    suggestions = []
+
+    if re.search(r"\b(skill|agente|subagent|swarm|busca|search|investiga|audit|revisa toda)\b", p):
+        if not re.search(r"\b(scope|alcance|criterio|formato de salida|output format|presupuesto|budget)\b", p):
+            suggestions.append("Define el alcance, el formato de salida esperado y los criterios de éxito para el skill/agente/swarm.")
+
+    if re.search(r"\b(memory bank|memoria|recuerda|\.memory-bank|activeContext|systemPatterns)\b", p):
+        if not re.search(r"\b(project|proyecto|topic|tema|decisión|decision|progreso|progress)\b", p):
+            suggestions.append("Especifica el proyecto/tema y qué tipo de memoria debe actualizarse (decisión, progreso, contexto activo).")
+
+    if re.search(r"\b(fix|arregla|debug|solve|resuelve|help|check)\b", p):
+        has_target = re.search(r"\b(file|archivo|function|función|class|line|línea|error|bug)\b", p)
+        has_path = "/" in prompt or "\\" in prompt
+        if not has_target and not has_path:
+            suggestions.append("Especifica el archivo, función o línea afectada.")
+
+    if re.search(r"\b(create|crear|build|implement|add|genera)\b", p):
+        if not any(w in p for w in ["test", "prueba", "error handling", "validación"]):
+            suggestions.append("Considera mencionar manejo de errores o validaciones.")
+
+    if re.search(r"\b(refactor|optimiz|improv|mejor|clean)\b", p):
+        if not any(w in p for w in ["compat", "break", "test"]):
+            suggestions.append("Indica si debe mantener compatibilidad o puede romper cambios.")
+
+    connectors = len(re.findall(r"\b(and|then|also|after|before|después|luego|también)\b", p))
+    if connectors >= 2 and "\n" not in prompt:
+        suggestions.append("Considera numerar los pasos para mayor claridad.")
+
+    if re.search(r"\b(bug|error|fail|crash|no funciona)\b", p):
+        if not any(w in p for w in ["traceback", "log", "mensaje", "stack", "línea"]):
+            suggestions.append("Incluye el mensaje de error o traceback si lo tienes.")
+
+    if len(prompt) > 400 and "\n" in prompt:
+        if not re.search(r"^\s*(task|contexto|context|fuente|source|restricciones|constraints|output|salida|format)\s*[:|\-]", prompt, re.IGNORECASE | re.MULTILINE):
+            suggestions.append("Estructura con secciones planas: Task / Context / Source / Constraints / Output format.")
+
+    if re.search(r"\b(refactor|analyze|analyze|analyz|review|revisar|audit)\b", p):
+        if not re.search(r"\b(if (unknown|missing)|si (falta|desconocido)|no aplica)\b", p):
+            suggestions.append("Define qué debe responder el agente si la fuente de verdad no está disponible.")
+
+    if "```" in prompt and len(prompt) > 300 and re.search(r"```[\s\S]+?```", prompt):
+        code_pos = prompt.find("```")
+        task_match = re.search(r"\b(implement|create|build|fix|refactor|explica|revisa|arregla)\b", prompt[:code_pos] if code_pos > 0 else prompt, re.IGNORECASE)
+        if task_match and code_pos > 0 and task_match.start() < code_pos:
+            suggestions.append("Coloca la tarea DESPUÉS del material fuente para mejor calidad de respuesta.")
+
+    if not suggestions:
+        return None
+
+    header = (
+        "Sugerencias para clarificar el prompt:"
+        if "á" in prompt or "é" in prompt or re.search(r"\b(el|la|los|las|es|son)\b", p)
+        else "Suggestions to clarify the prompt:"
+    )
+    return header + "\n- " + "\n- ".join(suggestions)
