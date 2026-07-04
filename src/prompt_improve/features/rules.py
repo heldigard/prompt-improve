@@ -121,7 +121,7 @@ def rule_based_suggestions(prompt: str) -> Optional[str]:
         if not re.search(r"^\s*(task|contexto|context|fuente|source|restricciones|constraints|output|salida|format)\s*[:|\-]", prompt, re.IGNORECASE | re.MULTILINE):
             suggestions.append("Estructura con secciones planas: Task / Context / Source / Constraints / Output format.")
 
-    if re.search(r"\b(refactor|analyze|analyze|analyz|review|revisar|audit)\b", p):
+    if re.search(r"\b(refactor|analyze|analyz|review|revisar|audit)\b", p):
         if not re.search(r"\b(if (unknown|missing)|si (falta|desconocido)|no aplica)\b", p):
             suggestions.append("Define qué debe responder el agente si la fuente de verdad no está disponible.")
 

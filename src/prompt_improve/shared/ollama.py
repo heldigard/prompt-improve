@@ -57,6 +57,7 @@ def start_ollama_best_effort() -> bool:
             stdin=subprocess.DEVNULL,
             start_new_session=True,
         )
+        log.close()
         with open(OLLAMA_PID, "w", encoding="utf-8") as f:
             f.write(str(proc.pid))
     except OSError:

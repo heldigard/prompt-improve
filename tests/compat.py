@@ -38,6 +38,9 @@ from prompt_improve.features.clean import (  # noqa: F401
     clean_rewrite as _clean_rewrite,
     clean_response as _clean_response,
     soften_invented_absolutes as _soften_invented_absolutes,
+    trim_bullet as _trim_bullet,
+    remove_long_examples as _remove_long_examples,
+    sanitize_bullet as _sanitize_bullet,
 )
 from prompt_improve.features.rules import (  # noqa: F401
     build_rewrite_system_prompt,
