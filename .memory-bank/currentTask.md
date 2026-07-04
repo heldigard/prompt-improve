@@ -2,16 +2,10 @@
 > Updated: 2026-07-04
 
 ## Goal
-- One-line objective
+- Verify logic correctness after monolith-to-package split
 
-## Scope
-- What is included
-- What is NOT included
-
-## Acceptance Criteria
-- [ ] Criterion 1
-- [ ] Criterion 2
-
-## Related
-- Files changed
-- PR / issue links
+## Status
+- [x] Review all 43 functions against monolith (1 bug found + fixed)
+- [x] All 49 tests passing
+- [ ] Test with more Ollama models (user installing them)
+- [ ] Update all CLIs to use new location

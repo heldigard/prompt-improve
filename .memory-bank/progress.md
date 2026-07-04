@@ -1,8 +1,11 @@
 # Progress
 
-## {today}
-- Memory bank initialized.
-
-## Format
-- [YYYY-MM-DD]: What was done + verification status
-- 2026-07-04T14:56:14Z | status:completed | session:bf07289a-2a17-4ad6-a0d8-6a8676198d3a | claude: One-line objective
+## 2026-07-04
+- Created ~/prompt-improve/ project with vertical-slice layout
+- Split 1244L monolith into 12 modules (shared/ + features/ + command.py)
+- Added role-based model routing (_ROLE_MODEL_MAP)
+- Dropped HauhauCS-4b from default candidates
+- Installed shim at ~/.claude/hooks/improve-prompt.py
+- 49/49 tests passing
+- Logic review: 42/43 OK, 1 bug fixed (rewrite-then-clarify framing)
+- Initial git commit + bug fix commit
