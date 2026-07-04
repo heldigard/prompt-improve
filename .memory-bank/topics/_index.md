@@ -3,3 +3,4 @@
 
 ## Topics
 - TBD
+- [foreign-sessions](foreign-sessions.md)
