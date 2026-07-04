@@ -2,26 +2,24 @@
 
 from __future__ import annotations
 
+import json
 import os
 import subprocess
 import time
-from typing import Optional
-from urllib.request import urlopen
 from urllib.error import HTTPError, URLError
-import json
+from urllib.request import urlopen
 
-from prompt_improve.shared import compat
 from prompt_improve.shared.config import (
-    OLLAMA_URL,
-    OLLAMA_LOG,
-    OLLAMA_PID,
-    OLLAMA_AUTOSTART,
-    OLLAMA_MODEL_CANDIDATES,
     _ROLE_MODEL_MAP,
+    OLLAMA_AUTOSTART,
+    OLLAMA_LOG,
+    OLLAMA_MODEL_CANDIDATES,
+    OLLAMA_PID,
+    OLLAMA_URL,
 )
 
 
-def _get_json(path: str, timeout: float) -> Optional[dict]:
+def _get_json(path: str, timeout: float) -> dict | None:
     try:
         with urlopen(f"{OLLAMA_URL.rstrip('/')}{path}", timeout=timeout) as response:
             return json.loads(response.read().decode("utf-8"))
@@ -41,12 +39,9 @@ def available_ollama_models() -> list[str]:
     return names
 
 
-def start_ollama_best_effort() -> bool:
-    """Start local Ollama if it is installed but not responding."""
-    if not OLLAMA_AUTOSTART:
-        return False
-    if available_ollama_models():
-        return True
+def _spawn_ollama() -> bool:
+    """Launch ``ollama serve`` detached and record its pid. Best-effort."""
+    log = None
     try:
         os.makedirs(os.path.dirname(OLLAMA_LOG), exist_ok=True)
         log = open(OLLAMA_LOG, "ab")
@@ -57,10 +52,26 @@ def start_ollama_best_effort() -> bool:
             stdin=subprocess.DEVNULL,
             start_new_session=True,
         )
-        log.close()
+    except OSError:
+        if log is not None:
+            log.close()
+        return False
+    log.close()
+    try:
         with open(OLLAMA_PID, "w", encoding="utf-8") as f:
             f.write(str(proc.pid))
     except OSError:
+        return False
+    return True
+
+
+def start_ollama_best_effort() -> bool:
+    """Start local Ollama if it is installed but not responding."""
+    if not OLLAMA_AUTOSTART:
+        return False
+    if available_ollama_models():
+        return True
+    if not _spawn_ollama():
         return False
     for _ in range(6):
         time.sleep(0.25)
@@ -69,28 +80,7 @@ def start_ollama_best_effort() -> bool:
     return False
 
 
-def ordered_ollama_models() -> list[str]:
-    available = available_ollama_models()
-    if not available:
-        start_ollama_best_effort()
-        available = available_ollama_models()
-    if not available:
-        return []
-    available_set = set(available)
-    ordered = []
-    for candidate in OLLAMA_MODEL_CANDIDATES:
-        if candidate in available_set:
-            ordered.append(candidate)
-    ordered.extend(model for model in available if model not in ordered)
-    return ordered
-
-
-def choose_ollama_model() -> Optional[str]:
-    models = ordered_ollama_models()
-    return models[0] if models else None
-
-
-def choose_ollama_model_for_role(role: str) -> tuple[Optional[str], list[str]]:
+def choose_ollama_model_for_role(role: str) -> tuple[str | None, list[str]]:
     """Pick the best available model for a specific task role.
 
     Returns (primary_model, fallback_models). The primary gets full timeout;

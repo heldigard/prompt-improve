@@ -3,10 +3,9 @@
 from __future__ import annotations
 
 import re
-from typing import Optional
 
-from prompt_improve.shared.config import _ABSOLUTE_REPLACEMENTS
 from prompt_improve.features.detect import detect_language
+from prompt_improve.shared.config import _ABSOLUTE_REPLACEMENTS
 
 
 def soften_invented_absolutes(text: str) -> str:
@@ -46,7 +45,7 @@ def sanitize_bullet(line: str) -> str:
     return line
 
 
-def clean_response(text: str, original: str) -> Optional[str]:
+def clean_response(text: str, original: str) -> str | None:
     """Clean a clarify-mode response into 1-3 bullets."""
     text = text.strip()
     if not text:
@@ -79,7 +78,7 @@ def clean_response(text: str, original: str) -> Optional[str]:
     return "\n".join(bullets) if bullets else None
 
 
-def clean_rewrite(text: str, original: str) -> Optional[str]:
+def clean_rewrite(text: str, original: str) -> str | None:
     """Clean a rewrite-mode response into a structured spec."""
     text = text.strip()
     if not text:

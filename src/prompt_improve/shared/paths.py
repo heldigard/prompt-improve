@@ -5,9 +5,9 @@ from __future__ import annotations
 
 import importlib.util
 import re
-from datetime import date, datetime, timezone
+from datetime import UTC, date, datetime
 from pathlib import Path
-from typing import Any, Optional
+from typing import Any
 
 _PROJECT_MEMORY: Any = None
 
@@ -73,7 +73,7 @@ def _filtered_current_task_text(path: Path) -> str:
     return "\n".join(lines)
 
 
-def _extract_date_age(clean: str, today: date) -> Optional[int]:
+def _extract_date_age(clean: str, today: date) -> int | None:
     """Return age in days if the line has a date, else None."""
     match = _DATE_RE.search(clean)
     if not match:
@@ -104,7 +104,7 @@ def _clean_task_line(line: str) -> str:
 
 def _parse_task_candidates(task_text: str, max_age_days: int) -> list[tuple[int, date, int, str]]:
     """Parse task lines into (priority, date, index, text) candidates."""
-    today = datetime.now(timezone.utc).date()
+    today = datetime.now(UTC).date()
     no_active = bool(_NO_ACTIVE_TASK_RE.search(task_text))
     completed = bool(_COMPLETED_HEADING_RE.search(task_text))
     in_managed = False
@@ -160,7 +160,7 @@ def should_include_task_hint(prompt: str) -> bool:
     return bool(_BARE_CONTINUATION_RE.match(p))
 
 
-def _find_current_task_file(root: Path) -> Optional[Path]:
+def _find_current_task_file(root: Path) -> Path | None:
     """Walk parents to find the nearest .memory-bank/currentTask.md."""
     for parent in [root, *root.parents]:
         if parent == parent.parent:
@@ -175,7 +175,7 @@ def _find_current_task_file(root: Path) -> Optional[Path]:
     return None
 
 
-def project_current_task_line(cwd: Optional[str], max_chars: int = 500) -> str:
+def project_current_task_line(cwd: str | None, max_chars: int = 500) -> str:
     if not cwd:
         return ""
     try:
@@ -188,7 +188,7 @@ def project_current_task_line(cwd: Optional[str], max_chars: int = 500) -> str:
     return current_task_hint_line(_filtered_current_task_text(ct))[:max_chars]
 
 
-def project_hint(cwd: Optional[str]) -> str:
+def project_hint(cwd: str | None) -> str:
     """One-line project anchor (cwd basename + currentTask)."""
     if not cwd:
         return ""
@@ -199,7 +199,7 @@ def project_hint(cwd: Optional[str]) -> str:
     return "; ".join(parts)
 
 
-def project_hint_for_prompt(prompt: str, cwd: Optional[str]) -> str:
+def project_hint_for_prompt(prompt: str, cwd: str | None) -> str:
     """Project anchor used by the LLM prompt improver."""
     if not cwd:
         return ""

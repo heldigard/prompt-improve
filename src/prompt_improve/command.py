@@ -5,9 +5,8 @@ from __future__ import annotations
 import json
 import os
 import sys
-from typing import Optional
 
-from prompt_improve.features.detect import detect_trivial, decide_mode, has_concrete_target
+from prompt_improve.features.detect import decide_mode, detect_trivial, has_concrete_target
 from prompt_improve.features.hints import continuation_context
 from prompt_improve.features.improve import route_and_improve
 from prompt_improve.features.rules import rule_based_suggestions
@@ -29,8 +28,8 @@ def _build_additional(improved: str, source: str, is_rewrite: bool) -> str:
 
 
 def _try_improve(
-    prompt: str, mode: str, cwd: Optional[str]
-) -> tuple[Optional[str], str, str]:
+    prompt: str, mode: str, cwd: str | None
+) -> tuple[str | None, str, str]:
     """Try LLM improvement, then rule-based fallback.
 
     Returns (improved, source, effective_mode). The effective_mode may differ
@@ -55,7 +54,7 @@ def _try_improve(
 
 
 def main() -> None:
-    cwd: Optional[str] = None
+    cwd: str | None = None
     try:
         data = json.load(sys.stdin)
         if isinstance(data, dict):

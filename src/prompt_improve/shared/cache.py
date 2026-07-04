@@ -6,16 +6,15 @@ import hashlib
 import json
 import time
 from pathlib import Path
-from typing import Optional
 
 from prompt_improve.shared.config import (
     CACHE_DIR,
-    CACHE_TTL_SECONDS,
     CACHE_SCHEMA_VERSION,
+    CACHE_TTL_SECONDS,
 )
 
 
-def _find_memory_bank(root: Path) -> Optional[Path]:
+def _find_memory_bank(root: Path) -> Path | None:
     """Walk parents to find the nearest .memory-bank/ directory."""
     for parent in [root, *root.parents]:
         if parent == parent.parent:
@@ -30,7 +29,7 @@ def _find_memory_bank(root: Path) -> Optional[Path]:
     return None
 
 
-def _project_cache_scope(cwd: Optional[str]) -> str:
+def _project_cache_scope(cwd: str | None) -> str:
     """Scope cache entries to the nearest project, not only prompt text."""
     if not cwd:
         return "global"
@@ -42,7 +41,7 @@ def _project_cache_scope(cwd: Optional[str]) -> str:
     return str(memory.parent) if memory else str(root)
 
 
-def _project_context_fingerprint(cwd: Optional[str]) -> str:
+def _project_context_fingerprint(cwd: str | None) -> str:
     """Fingerprint memory files that influence prompt rewriting."""
     if not cwd:
         return "no-memory"
@@ -64,11 +63,11 @@ def _project_context_fingerprint(cwd: Optional[str]) -> str:
     return "|".join(parts) if parts else "empty-memory"
 
 
-def _cache_key(prompt: str, mode: str, cwd: Optional[str] = None) -> str:
+def _cache_key(prompt: str, mode: str, cwd: str | None = None) -> str:
     scope = _project_cache_scope(cwd)
     fingerprint = _project_context_fingerprint(cwd)
     return hashlib.sha256(
-        f"{CACHE_SCHEMA_VERSION}:{mode}:{scope}:{fingerprint}:{prompt}".encode("utf-8")
+        f"{CACHE_SCHEMA_VERSION}:{mode}:{scope}:{fingerprint}:{prompt}".encode()
     ).hexdigest()[:32]
 
 
@@ -76,7 +75,7 @@ def _cache_path(key: str) -> Path:
     return CACHE_DIR / f"{key}.json"
 
 
-def load_cached(prompt: str, mode: str, cwd: Optional[str] = None) -> Optional[tuple[str, str]]:
+def load_cached(prompt: str, mode: str, cwd: str | None = None) -> tuple[str, str] | None:
     if CACHE_TTL_SECONDS <= 0:
         return None
     path = _cache_path(_cache_key(prompt, mode, cwd))
@@ -93,7 +92,7 @@ def load_cached(prompt: str, mode: str, cwd: Optional[str] = None) -> Optional[t
 
 
 def save_cached(
-    prompt: str, mode: str, text: str, source: str, cwd: Optional[str] = None
+    prompt: str, mode: str, text: str, source: str, cwd: str | None = None
 ) -> None:
     if CACHE_TTL_SECONDS <= 0:
         return

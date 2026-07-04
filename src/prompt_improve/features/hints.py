@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-from typing import Optional
-
 from prompt_improve.features.detect import detect_language
 from prompt_improve.shared.paths import (
     project_current_task_line,
@@ -11,7 +9,7 @@ from prompt_improve.shared.paths import (
 )
 
 
-def continuation_context(prompt: str, cwd: Optional[str]) -> Optional[str]:
+def continuation_context(prompt: str, cwd: str | None) -> str | None:
     """Deterministic expansion for bare continuation prompts."""
     if not should_include_task_hint(prompt):
         return None

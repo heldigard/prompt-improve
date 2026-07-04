@@ -45,6 +45,12 @@ target-version = "py311"
 select = ["E", "F", "W", "I", "UP", "B"]
 ignore = ["E501"]
 
+# tests/compat.py is a re-export shim: tests consume its names via attribute
+# access (ip._trim_bullet, ip._cache_key, ...) which the linter cannot see.
+# F401/I001 --fix would silently delete those re-exports and break the suite.
+[tool.ruff.lint.per-file-ignores]
+"tests/compat.py" = ["F401", "I001"]
+
 [tool.hatch.build.targets.wheel]
 packages = ["src/prompt_improve"]
 

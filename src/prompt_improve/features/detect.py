@@ -4,13 +4,12 @@ from __future__ import annotations
 
 import os
 import re
-from typing import Optional
 
 from prompt_improve.shared.config import (
-    TASK_VERBS_RE,
-    _CONCRETE_FILE_RE,
     _CONCRETE_ACTION_RE,
+    _CONCRETE_FILE_RE,
     REWRITE_THRESHOLD,
+    TASK_VERBS_RE,
 )
 from prompt_improve.shared.paths import _BARE_CONTINUATION_RE
 

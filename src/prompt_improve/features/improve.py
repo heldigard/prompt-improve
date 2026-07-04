@@ -3,32 +3,32 @@
 
 from __future__ import annotations
 
-from typing import Callable, Optional
+from collections.abc import Callable
 
-from prompt_improve.shared import compat
-from prompt_improve.shared.config import OLLAMA_URL, OLLAMA_TIMEOUT, CLOUD_FALLBACK
-from prompt_improve.shared.ollama import choose_ollama_model_for_role
-from prompt_improve.shared.cache import load_cached, save_cached
-from prompt_improve.shared.paths import project_hint_for_prompt
-from prompt_improve.features.detect import detect_language
 from prompt_improve.features.classify import needs_cloud_intelligence
 from prompt_improve.features.clean import clean_response, clean_rewrite
+from prompt_improve.features.detect import detect_language
 from prompt_improve.features.rules import SYSTEM_PROMPT, build_rewrite_system_prompt
+from prompt_improve.shared import compat
+from prompt_improve.shared.cache import load_cached, save_cached
+from prompt_improve.shared.config import CLOUD_FALLBACK, OLLAMA_TIMEOUT, OLLAMA_URL
+from prompt_improve.shared.ollama import choose_ollama_model_for_role
+from prompt_improve.shared.paths import project_hint_for_prompt
 
 
 def _run_ollama_models(
     role: str,
     messages: list[dict],
-    cleaner: Callable[[str, str], Optional[str]],
+    cleaner: Callable[[str, str], str | None],
     prompt: str,
     cache_mode: str,
-    cwd: Optional[str],
+    cwd: str | None,
     temperature: float,
     num_predict: int,
     num_ctx: int,
     timeout_first: float,
     timeout_fallback: float,
-) -> Optional[tuple[str, str]]:
+) -> tuple[str, str] | None:
     """Try role-specific Ollama models in order. Returns (cleaned, source) or None."""
     if compat.ollama_client is None:
         return None
@@ -61,7 +61,7 @@ def _run_ollama_models(
     return None
 
 
-def call_ollama(prompt: str, cwd: Optional[str] = None) -> Optional[tuple[str, str]]:
+def call_ollama(prompt: str, cwd: str | None = None) -> tuple[str, str] | None:
     """Clarify mode: 1-3 action bullets via Ollama."""
     cached = load_cached(prompt, "clarify", cwd)
     if cached:
@@ -88,7 +88,7 @@ def call_ollama(prompt: str, cwd: Optional[str] = None) -> Optional[tuple[str, s
     )
 
 
-def call_ollama_rewrite(prompt: str, cwd: Optional[str] = None) -> Optional[tuple[str, str]]:
+def call_ollama_rewrite(prompt: str, cwd: str | None = None) -> tuple[str, str] | None:
     """Rewrite mode: short/vague prompt → structured spec via Ollama."""
     cached = load_cached(prompt, "rewrite", cwd)
     if cached:
@@ -114,9 +114,9 @@ def call_ollama_rewrite(prompt: str, cwd: Optional[str] = None) -> Optional[tupl
 
 
 def call_cloud_cascade(
-    prompt: str, mode: str, cwd: Optional[str] = None,
-    cloud_model: Optional[str] = None,
-) -> Optional[tuple[str, str]]:
+    prompt: str, mode: str, cwd: str | None = None,
+    cloud_model: str | None = None,
+) -> tuple[str, str] | None:
     """Cloud via cheap_llm cascade (cross-provider failover)."""
     if not CLOUD_FALLBACK or compat.cheap_complete is None:
         return None
@@ -156,8 +156,8 @@ def call_cloud_cascade(
 
 
 def route_and_improve(
-    prompt: str, mode: str, cwd: Optional[str]
-) -> Optional[tuple[str, str]]:
+    prompt: str, mode: str, cwd: str | None
+) -> tuple[str, str] | None:
     """Intelligent model router: hard → cloud first, else local first; cloud as availability fallback."""
     if needs_cloud_intelligence(prompt, mode):
         result = call_cloud_cascade(prompt, mode, cwd, cloud_model="deepseek/deepseek-v4-flash")

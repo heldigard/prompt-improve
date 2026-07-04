@@ -3,10 +3,6 @@
 from __future__ import annotations
 
 import re
-from typing import Optional
-
-from prompt_improve.features.detect import detect_language
-
 
 SYSTEM_PROMPT = (
     "You are a prompt-clarity assistant for an AUTONOMOUS coding agent — not a human.\n"
@@ -82,7 +78,7 @@ def build_rewrite_system_prompt(language: str) -> str:
     )
 
 
-def rule_based_suggestions(prompt: str) -> Optional[str]:
+def rule_based_suggestions(prompt: str) -> str | None:
     """Static heuristic suggestions as last-resort fallback."""
     p = prompt.lower()
     suggestions = []

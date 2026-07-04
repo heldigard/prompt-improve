@@ -618,9 +618,10 @@ def test_cloud_cascade_env_opt_out():
 def test_cloud_cascade_postprocesses_output():
     """Cloud output runs through the SAME _clean pipeline: invented absolutes softened,
     'Preguntas de validación' stripped, source labeled cloud:<model>."""
+    import types as _types
+
     import prompt_improve.features.improve as imod
     import prompt_improve.shared.config as cfg
-    import types as _types
     stub = _types.ModuleType("cheap_llm")
 
     def fake_complete(**_):
@@ -631,7 +632,7 @@ def test_cloud_cascade_postprocesses_output():
             "tier": "T2",
         }
 
-    setattr(stub, "cheap_complete", fake_complete)
+    stub.cheap_complete = fake_complete
     cfg.CLOUD_FALLBACK = True
     imod.CLOUD_FALLBACK = True
     old_compat = imod.compat.cheap_complete
@@ -777,8 +778,8 @@ def test_choose_model_for_role_falls_back_when_primary_unavailable():
 
 def test_choose_model_for_role_env_override():
     """OLLAMA_IMPROVE_ROLE_PROMPT_REWRITE env var overrides the default."""
-    import prompt_improve.shared.ollama as omod
     import prompt_improve.shared.config as cfg
+    import prompt_improve.shared.ollama as omod
     orig_env = os.environ.get("OLLAMA_IMPROVE_ROLE_PROMPT_REWRITE")
     orig_models = omod.available_ollama_models
     omod.available_ollama_models = lambda: ["custom-model:latest", "qwen3.5:4b"]
