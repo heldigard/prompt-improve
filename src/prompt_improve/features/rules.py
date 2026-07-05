@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import re
 
+from prompt_improve.features.target import GENERIC_TARGET, TargetProfile, target_guidance
+
 SYSTEM_PROMPT = (
     "You are a prompt-clarity assistant for an AUTONOMOUS coding agent — not a human.\n"
     "The agent HAS tools: grep/ast-grep, LSP, codeq (symbol lookup), file read/edit, "
@@ -32,7 +34,10 @@ SYSTEM_PROMPT = (
 )
 
 
-def build_rewrite_system_prompt(language: str) -> str:
+def build_rewrite_system_prompt(
+    language: str,
+    target: TargetProfile = GENERIC_TARGET,
+) -> str:
     """Language-aware rewrite system prompt."""
     if language == "Spanish":
         task_kw, ctx, obj, constr, accept = (
@@ -81,6 +86,7 @@ def build_rewrite_system_prompt(language: str) -> str:
         f"- {obj}: what to achieve.\n"
         f"- {constr}: boundaries (only if inferable).\n"
         f"- {accept}: a runnable check (only if inferable).\n"
+        f"{target_guidance(target, 'rewrite', language)}\n"
         "- Keep it concise (max ~140 words).\n"
         f"- {agent_note}\n"
     )

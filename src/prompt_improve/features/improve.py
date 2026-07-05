@@ -11,6 +11,12 @@ from prompt_improve.features.classify import needs_cloud_intelligence
 from prompt_improve.features.clean import clean_response, clean_rewrite
 from prompt_improve.features.detect import detect_language
 from prompt_improve.features.rules import SYSTEM_PROMPT, build_rewrite_system_prompt
+from prompt_improve.features.target import (
+    GENERIC_TARGET,
+    TargetProfile,
+    target_guidance,
+    target_profile_from_request,
+)
 from prompt_improve.shared import compat
 from prompt_improve.shared.cache import load_cached, save_cached
 from prompt_improve.shared.config import CLOUD_FALLBACK, OLLAMA_TIMEOUT, OLLAMA_URL
