@@ -26,6 +26,7 @@ The NEW `~/ollama-bench` scorer now ALSO detects `<|channel>` (added to `LEAK_PA
 - MiniMax: **MiniMax 3**
 - MiMo: **MiMo 2.5 Pro**
 - DeepSeek: **DeepSeek V4 Pro**, **DeepSeek V4 Flash**
+- Gemini/Antigravity: `agy35-flash` maps to **Gemini 3.5 Flash (High)**; `agy3-pro` maps to **Gemini 3.1 Pro (High)** for 1M-context work.
 
 ## Commands
 - Install: `pip install -e ~/prompt-improve`

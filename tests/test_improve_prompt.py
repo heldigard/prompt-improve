@@ -1342,6 +1342,7 @@ def test_target_profile_classifies_primary_cli_models():
     assert profile_for_model("claude-fable-5", "claude").family == "claude"
     assert profile_for_model("gpt-5.5", "codex").family == "openai-gpt"
     assert profile_for_model("gpt-5.6", "codex").version == "5.6"
+    assert profile_for_model("Gemini 3.5 Flash (High)", "antigravity").family == "gemini"
     assert profile_for_model("Gemini 3.1 Pro (High)", "antigravity").family == "gemini"
 
 
@@ -1350,6 +1351,7 @@ def test_target_profile_classifies_proxy_shell_models():
 
     assert profile_for_model("MiniMax-M3[1m]", "mini").family == "minimax"
     assert profile_for_model("kimi-2.7-code", "kimi").family == "kimi"
+    assert profile_for_model("mimo-2.5-pro", "mimo").family == "mimo"
     assert profile_for_model("deepseek-v4-pro[1m]", "dseek").family == "deepseek"
     assert profile_for_model("glm-5.2[1m]", "zai").family == "glm"
     assert profile_for_model("qwen3.7-max[1m]", "qwen").family == "qwen"
@@ -1381,7 +1383,7 @@ def test_build_messages_uses_gemini_component_guidance():
     import prompt_improve.features.improve as m
     from prompt_improve.features.target import profile_for_model
 
-    target = profile_for_model("Gemini 3.1 Pro (High)", "antigravity")
+    target = profile_for_model("Gemini 3.5 Flash (High)", "antigravity")
     system, _ = m._build_messages("rewrite", "fix the bug", None, target)
     assert "Gemini/Antigravity" in system
     assert "Objective" in system
