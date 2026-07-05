@@ -91,7 +91,16 @@ def _run_ollama_models(
     return None
 
 
-def _build_messages(mode: str, prompt: str, cwd: str | None) -> tuple[str, str]:
+def _cache_mode(mode: str, target: TargetProfile) -> str:
+    return f"{mode}:{target.cache_key}"
+
+
+def _build_messages(
+    mode: str,
+    prompt: str,
+    cwd: str | None,
+    target: TargetProfile = GENERIC_TARGET,
+) -> tuple[str, str]:
     """Compose (system_prompt, user_message) for a given mode.
 
     Shared across call_ollama / call_ollama_rewrite / call_cloud_cascade so the
@@ -102,10 +111,10 @@ def _build_messages(mode: str, prompt: str, cwd: str | None) -> tuple[str, str]:
     hint = project_hint_for_prompt(prompt, cwd)
     hint_line = f"Project context: {hint}\n" if hint else ""
     if mode == "rewrite":
-        system = build_rewrite_system_prompt(language)
+        system = build_rewrite_system_prompt(language, target)
         user = f"Respond and write the rewritten prompt in {language}.\n{hint_line}\nOriginal prompt:\n{prompt}"
     else:
-        system = SYSTEM_PROMPT
+        system = SYSTEM_PROMPT + target_guidance(target, "clarify", language) + "\n"
         user = (
             f"Respond in {language}.\n{hint_line}\nOriginal prompt:\n{prompt}\n\n"
             "What should the agent DO or VERIFY before executing? "
@@ -114,19 +123,25 @@ def _build_messages(mode: str, prompt: str, cwd: str | None) -> tuple[str, str]:
     return system, user
 
 
-def call_ollama(prompt: str, cwd: str | None = None) -> tuple[str, str] | None:
+def call_ollama(
+    prompt: str,
+    cwd: str | None = None,
+    target: TargetProfile | None = None,
+) -> tuple[str, str] | None:
     """Clarify mode: 1-3 action bullets via Ollama."""
-    cached = load_cached(prompt, "clarify", cwd)
+    target = target or target_profile_from_request()
+    cache_mode = _cache_mode("clarify", target)
+    cached = load_cached(prompt, cache_mode, cwd)
     if cached:
         return cached
-    system, user = _build_messages("clarify", prompt, cwd)
+    system, user = _build_messages("clarify", prompt, cwd, target)
     messages = [{"role": "system", "content": system}, {"role": "user", "content": user}]
     return _run_ollama_models(
         "prompt_clarify",
         messages,
         clean_response,
         prompt,
-        "clarify",
+        cache_mode,
         cwd,
         temperature=0.15,
         num_predict=160,
@@ -136,19 +151,25 @@ def call_ollama(prompt: str, cwd: str | None = None) -> tuple[str, str] | None:
     )
 
 
-def call_ollama_rewrite(prompt: str, cwd: str | None = None) -> tuple[str, str] | None:
+def call_ollama_rewrite(
+    prompt: str,
+    cwd: str | None = None,
+    target: TargetProfile | None = None,
+) -> tuple[str, str] | None:
     """Rewrite mode: short/vague prompt → structured spec via Ollama."""
-    cached = load_cached(prompt, "rewrite", cwd)
+    target = target or target_profile_from_request()
+    cache_mode = _cache_mode("rewrite", target)
+    cached = load_cached(prompt, cache_mode, cwd)
     if cached:
         return cached
-    system, user = _build_messages("rewrite", prompt, cwd)
+    system, user = _build_messages("rewrite", prompt, cwd, target)
     messages = [{"role": "system", "content": system}, {"role": "user", "content": user}]
     return _run_ollama_models(
         "prompt_rewrite",
         messages,
         clean_rewrite,
         prompt,
-        "rewrite",
+        cache_mode,
         cwd,
         temperature=0.2,
         num_predict=600,
@@ -163,12 +184,14 @@ def call_cloud_cascade(
     mode: str,
     cwd: str | None = None,
     cloud_model: str | None = None,
+    target: TargetProfile | None = None,
 ) -> tuple[str, str] | None:
     """Cloud via cheap_llm cascade (cross-provider failover)."""
     if not CLOUD_FALLBACK or compat.cheap_complete is None:
         _debug("cloud cascade disabled or cheap_llm unavailable")
         return None
-    system, user = _build_messages(mode, prompt, cwd)
+    target = target or target_profile_from_request()
+    system, user = _build_messages(mode, prompt, cwd, target)
     try:
         result = compat.cheap_complete(
             system=system,
@@ -195,17 +218,33 @@ def call_cloud_cascade(
     return text, f"cloud:{model}"
 
 
-def route_and_improve(prompt: str, mode: str, cwd: str | None) -> tuple[str, str] | None:
+def route_and_improve(
+    prompt: str,
+    mode: str,
+    cwd: str | None,
+    target: TargetProfile | None = None,
+) -> tuple[str, str] | None:
     """Intelligent model router: hard → cloud first, else local first; cloud as availability fallback."""
+    target = target or target_profile_from_request()
     if needs_cloud_intelligence(prompt, mode):
         _debug("hard prompt → cloud-first (deepseek-v4-flash)")
-        result = call_cloud_cascade(prompt, mode, cwd, cloud_model="deepseek/deepseek-v4-flash")
+        result = call_cloud_cascade(
+            prompt,
+            mode,
+            cwd,
+            cloud_model="deepseek/deepseek-v4-flash",
+            target=target,
+        )
         if result:
             return result
         _debug("cloud-first failed, falling back to local")
     _debug(f"trying local ({mode})")
-    result = call_ollama_rewrite(prompt, cwd) if mode == "rewrite" else call_ollama(prompt, cwd)
+    result = (
+        call_ollama_rewrite(prompt, cwd, target)
+        if mode == "rewrite"
+        else call_ollama(prompt, cwd, target)
+    )
     if result:
         return result
     _debug("local unavailable, trying cloud availability fallback")
-    return call_cloud_cascade(prompt, mode, cwd)
+    return call_cloud_cascade(prompt, mode, cwd, target=target)

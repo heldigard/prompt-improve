@@ -10,6 +10,7 @@ from prompt_improve.features.detect import decide_mode, detect_trivial, has_conc
 from prompt_improve.features.hints import continuation_context
 from prompt_improve.features.improve import route_and_improve
 from prompt_improve.features.rules import rule_based_suggestions
+from prompt_improve.features.target import TargetProfile, target_profile_from_request
 
 
 def _passthrough() -> None:
@@ -27,7 +28,12 @@ def _build_additional(improved: str, source: str, is_rewrite: bool) -> str:
     return f"[Mejora de prompt: {source}]\n\n{improved}"
 
 
-def _try_improve(prompt: str, mode: str, cwd: str | None) -> tuple[str | None, str, str]:
+def _try_improve(
+    prompt: str,
+    mode: str,
+    cwd: str | None,
+    target: TargetProfile | None = None,
+) -> tuple[str | None, str, str]:
     """Try LLM improvement, then rule-based fallback.
 
     Returns (improved, source, effective_mode). The effective_mode may differ
@@ -38,12 +44,13 @@ def _try_improve(prompt: str, mode: str, cwd: str | None) -> tuple[str | None, s
         if deterministic:
             return deterministic, "memory:currentTask", "rewrite"
 
-    result = route_and_improve(prompt, mode, cwd)
+    target = target or target_profile_from_request()
+    result = route_and_improve(prompt, mode, cwd, target)
     if result:
         return result[0], result[1], mode
 
     if mode == "rewrite":
-        result = route_and_improve(prompt, "clarify", cwd)
+        result = route_and_improve(prompt, "clarify", cwd, target)
         if result:
             return result[0], result[1], "clarify"
 
@@ -53,15 +60,18 @@ def _try_improve(prompt: str, mode: str, cwd: str | None) -> tuple[str | None, s
 
 def main() -> None:
     cwd: str | None = None
+    data: dict | None = None
     try:
-        data = json.load(sys.stdin)
+        loaded = json.load(sys.stdin)
+        data = loaded if isinstance(loaded, dict) else None
         if isinstance(data, dict):
             prompt = data.get("prompt", "").strip()
             cwd = data.get("cwd") or data.get("cwd_path")
         else:
             prompt = ""
     except (json.JSONDecodeError, OSError):
-        prompt = sys.stdin.read().strip()
+        prompt = " ".join(sys.argv[1:]).strip() if len(sys.argv) > 1 else sys.stdin.read().strip()
+    target = target_profile_from_request(data)
 
     if (
         "[NO_DELEGATE]" in prompt
@@ -86,7 +96,7 @@ def main() -> None:
         _passthrough()
         return
 
-    improved, source, effective_mode = _try_improve(prompt, mode, cwd)
+    improved, source, effective_mode = _try_improve(prompt, mode, cwd, target)
 
     if not improved:
         _passthrough()
