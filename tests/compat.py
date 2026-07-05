@@ -1,7 +1,7 @@
 """Compatibility shim — re-exports all symbols tests expect from the old monolith.
 
 Tests import this as ``ip`` to get the same interface as the old
-``improve-prompt.py`` hook module.
+``prompt-improve.py`` hook module.
 """
 
 from prompt_improve.shared.config import (  # noqa: F401

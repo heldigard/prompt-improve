@@ -18,6 +18,15 @@ The NEW `~/ollama-bench` scorer now ALSO detects `<|channel>` (added to `LEAK_PA
 - `cheap_llm` — cloud cascade at `~/.claude/scripts/cheap_llm.py`
 - Both bootstrapped via `shared/compat.py` (absolute path, symlink-safe)
 
+## Current target model versions (user-stated, 2026-07-05)
+- Claude: **Sonnet 5**, **Opus 4.8**, **Fable 5**
+- Codex/OpenAI: **GPT 5.5**, **GPT 5.6**
+- Z.AI/GLM: **GLM 5.2 Code**
+- Kimi: **Kimi 2.7 Code**
+- MiniMax: **MiniMax 3**
+- MiMo: **MiMo 2.5 Pro**
+- DeepSeek: **DeepSeek V4 Pro**, **DeepSeek V4 Flash**
+
 ## Commands
 - Install: `pip install -e ~/prompt-improve`
 - Test: `cd ~/prompt-improve && python3 -m pytest tests/ -q`
@@ -26,7 +35,7 @@ The NEW `~/ollama-bench` scorer now ALSO detects `<|channel>` (added to `LEAK_PA
 ## Related projects
 - `~/codeq/` — code-fact extraction CLI (same layout pattern)
 - `~/smart-trim/` — PreCompact context-compression hook (same layout pattern)
-- `~/.claude/hooks/improve-prompt.py` — shim location (settings.json wired path)
+- `~/.claude/hooks/prompt-improve.py` — shim location (settings.json wired path)
 
 ## Env vars
 - `OLLAMA_IMPROVE_MODELS` — override global model candidates

@@ -79,6 +79,10 @@ def profile_for_model(model: str, cli: str | None = None) -> TargetProfile:
         return TargetProfile(clean_cli, clean_model, "deepseek", _version(lower), "explicit-steps")
     if _looks_like_minimax(lower):
         return TargetProfile(clean_cli, clean_model, "minimax", _version(lower), "agentic-markdown")
+    if _looks_like_kimi(lower):
+        return TargetProfile(clean_cli, clean_model, "kimi", _version(lower), "agentic-markdown")
+    if _looks_like_mimo(lower):
+        return TargetProfile(clean_cli, clean_model, "mimo", _version(lower), "explicit-steps")
     if _looks_like_glm(lower):
         return TargetProfile(clean_cli, clean_model, "glm", _version(lower), "explicit-steps")
     if _looks_like_gemma(lower):
@@ -94,7 +98,7 @@ def target_guidance(target: TargetProfile, mode: str, language: str) -> str:
         return _openai_guidance(mode, language)
     if target.family == "gemini":
         return _gemini_guidance(mode, language)
-    if target.family in {"qwen", "deepseek", "glm", "minimax"}:
+    if target.family in {"qwen", "deepseek", "glm", "minimax", "kimi", "mimo"}:
         return _literal_guidance(mode)
     if target.family == "gemma":
         return _compact_guidance(mode)
@@ -256,6 +260,14 @@ def _looks_like_deepseek(text: str) -> bool:
 
 def _looks_like_minimax(text: str) -> bool:
     return "minimax" in text or "mini" in text
+
+
+def _looks_like_kimi(text: str) -> bool:
+    return "kimi" in text
+
+
+def _looks_like_mimo(text: str) -> bool:
+    return "mimo" in text
 
 
 def _looks_like_glm(text: str) -> bool:

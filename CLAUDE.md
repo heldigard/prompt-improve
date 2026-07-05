@@ -2,13 +2,13 @@
 
 `prompt-improve` — LLM-powered prompt improvement hook for Claude Code (and
 Codex/Gemini via symlink). Graduated from the monolithic
-`~/.claude/hooks/improve-prompt.py` (1244L) into its own vertical-slice package,
+`~/.claude/hooks/prompt-improve.py` (1244L) into its own vertical-slice package,
 mirroring the `codeq` and `smart-trim` project layouts.
 
 ## Architecture: vertical-slice hook package (NOT a CLI)
 
 prompt-improve is a **UserPromptSubmit hook**, not a CLI. Entry point is
-`~/.claude/hooks/improve-prompt.py` — a ~20-line **shim** that does only:
+`~/.claude/hooks/prompt-improve.py` — a ~20-line **shim** that does only:
 `from prompt_improve.command import main; main()`. The hook is wired in
 `~/.claude/settings.json`. The shim preserves that wired path.
 

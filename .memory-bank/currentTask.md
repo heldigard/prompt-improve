@@ -2,10 +2,10 @@
 > Updated: 2026-07-04
 
 ## Goal
-- Verify logic correctness after monolith-to-package split
+- Maintain target-aware prompt improvement for Claude Code, Codex, and Antigravity/Gemini.
 
 ## Status
-- [x] Review all 43 functions against monolith (1 bug found + fixed)
-- [x] All 49 tests passing
-- [ ] Test with more Ollama models (user installing them)
-- [ ] Update all CLIs to use new location
+- [x] Target profile implementation present (`features/target.py`)
+- [x] Regression tests cover Claude, Codex/OpenAI GPT, Antigravity/Gemini, and proxy shell models
+- [x] README documents env overrides and per-family prompt shapes
+- [x] Shell wrappers `ec53`/`ec54` export `PROMPT_IMPROVE_TARGET_*` explicitly before calling `enhance`

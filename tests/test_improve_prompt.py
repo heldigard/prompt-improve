@@ -1331,6 +1331,72 @@ def test_build_messages_omits_hint_when_no_cwd():
     assert "Project context:" not in user
 
 
+# ---- target model profiles --------------------------------------------------
+
+
+def test_target_profile_classifies_primary_cli_models():
+    from prompt_improve.features.target import profile_for_model
+
+    assert profile_for_model("claude-opus-4-8", "claude").family == "claude"
+    assert profile_for_model("claude-sonnet-5", "claude").style == "xml-tags"
+    assert profile_for_model("claude-fable-5", "claude").family == "claude"
+    assert profile_for_model("gpt-5.5", "codex").family == "openai-gpt"
+    assert profile_for_model("gpt-5.6", "codex").version == "5.6"
+    assert profile_for_model("Gemini 3.1 Pro (High)", "antigravity").family == "gemini"
+
+
+def test_target_profile_classifies_proxy_shell_models():
+    from prompt_improve.features.target import profile_for_model
+
+    assert profile_for_model("MiniMax-M3[1m]", "mini").family == "minimax"
+    assert profile_for_model("kimi-2.7-code", "kimi").family == "kimi"
+    assert profile_for_model("deepseek-v4-pro[1m]", "dseek").family == "deepseek"
+    assert profile_for_model("glm-5.2[1m]", "zai").family == "glm"
+    assert profile_for_model("qwen3.7-max[1m]", "qwen").family == "qwen"
+
+
+def test_build_messages_uses_claude_xml_guidance():
+    import prompt_improve.features.improve as m
+    from prompt_improve.features.target import profile_for_model
+
+    target = profile_for_model("claude-opus-4-8", "claude")
+    system, _ = m._build_messages("rewrite", "fix the bug", None, target)
+    assert "Claude family" in system
+    assert "<task>" in system
+    assert "<acceptance>" in system
+
+
+def test_build_messages_uses_codex_markdown_guidance():
+    import prompt_improve.features.improve as m
+    from prompt_improve.features.target import profile_for_model
+
+    target = profile_for_model("gpt-5.5", "codex")
+    system, _ = m._build_messages("rewrite", "fix the bug", None, target)
+    assert "OpenAI GPT/Codex" in system
+    assert "Markdown sections" in system
+    assert "do not use XML" in system
+
+
+def test_build_messages_uses_gemini_component_guidance():
+    import prompt_improve.features.improve as m
+    from prompt_improve.features.target import profile_for_model
+
+    target = profile_for_model("Gemini 3.1 Pro (High)", "antigravity")
+    system, _ = m._build_messages("rewrite", "fix the bug", None, target)
+    assert "Gemini/Antigravity" in system
+    assert "Objective" in system
+    assert "Output format" in system
+
+
+def test_cache_mode_is_target_specific():
+    import prompt_improve.features.improve as m
+    from prompt_improve.features.target import profile_for_model
+
+    claude = profile_for_model("claude-sonnet-5", "claude")
+    codex = profile_for_model("gpt-5.5", "codex")
+    assert m._cache_mode("rewrite", claude) != m._cache_mode("rewrite", codex)
+
+
 # ---- cache TTL=0 disables caching ------------------------------------------
 
 
@@ -1465,6 +1531,25 @@ def _run_main_via_stdin(prompt: str, cwd: str | None = None, env: dict | None = 
                 os.environ[k] = v
 
 
+def _run_main_via_argv(*args: str):
+    """Drive command.main() as a direct CLI helper, not as a hook."""
+    from prompt_improve import command
+
+    saved_stdin = sys.stdin
+    saved_stdout = sys.stdout
+    saved_argv = sys.argv
+    try:
+        sys.stdin = io.StringIO("")
+        sys.stdout = io.StringIO()
+        sys.argv = ["prompt-improve.py", *args]
+        command.main()
+        return sys.stdout.getvalue()
+    finally:
+        sys.stdin = saved_stdin
+        sys.stdout = saved_stdout
+        sys.argv = saved_argv
+
+
 def test_command_main_passthrough_on_no_improve_marker():
     """[NO_IMPROVE] bypasses everything — emits a bare continue=true."""
     out = _run_main_via_stdin("implement the feature", env={"NO_IMPROVE": "1"})
@@ -1515,3 +1600,20 @@ def test_command_main_emits_additional_context_on_rewrite():
     assert "[Prompt expandido" in ctx
     assert "fake" in ctx
     assert "Tarea" in ctx
+
+
+def test_command_main_direct_cli_outputs_plain_improved_prompt():
+    """Direct enhance/argv mode emits text for shell wrappers, not hook JSON."""
+    import prompt_improve.command as cmd
+
+    def fake_route(_prompt, _mode, _cwd=None, target=None):
+        return ("Task: Implement X.", "ollama:fake")
+
+    orig = cmd.route_and_improve
+    cmd.route_and_improve = fake_route
+    try:
+        out = _run_main_via_argv("implementa", "la", "funcion", "foo")
+    finally:
+        cmd.route_and_improve = orig
+    assert out.strip() == "Task: Implement X."
+    assert "hookSpecificOutput" not in out

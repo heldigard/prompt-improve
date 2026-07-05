@@ -28,6 +28,12 @@ def _build_additional(improved: str, source: str, is_rewrite: bool) -> str:
     return f"[Mejora de prompt: {source}]\n\n{improved}"
 
 
+def _build_direct_output(original: str, improved: str, is_rewrite: bool) -> str:
+    if is_rewrite:
+        return improved
+    return f"{original}\n\nPrompt improvement notes:\n{improved}"
+
+
 def _try_improve(
     prompt: str,
     mode: str,
@@ -61,6 +67,7 @@ def _try_improve(
 def main() -> None:
     cwd: str | None = None
     data: dict | None = None
+    direct_cli = False
     try:
         loaded = json.load(sys.stdin)
         data = loaded if isinstance(loaded, dict) else None
@@ -70,7 +77,11 @@ def main() -> None:
         else:
             prompt = ""
     except (json.JSONDecodeError, OSError):
-        prompt = " ".join(sys.argv[1:]).strip() if len(sys.argv) > 1 else sys.stdin.read().strip()
+        if len(sys.argv) > 1:
+            prompt = " ".join(sys.argv[1:]).strip()
+            direct_cli = True
+        else:
+            prompt = sys.stdin.read().strip()
     target = target_profile_from_request(data)
 
     if (
@@ -83,26 +94,30 @@ def main() -> None:
         or os.environ.get("CODEX_WORKER")
         or os.environ.get("SWARM_WORKER")
     ):
-        _passthrough()
+        print(prompt) if direct_cli else _passthrough()
         return
 
     if not prompt or detect_trivial(prompt):
-        _passthrough()
+        print(prompt) if direct_cli else _passthrough()
         return
 
     mode = decide_mode(prompt)
 
     if mode == "rewrite" and has_concrete_target(prompt):
-        _passthrough()
+        print(prompt) if direct_cli else _passthrough()
         return
 
     improved, source, effective_mode = _try_improve(prompt, mode, cwd, target)
 
     if not improved:
-        _passthrough()
+        print(prompt) if direct_cli else _passthrough()
         return
 
     is_rewrite = source.startswith("memory:") or effective_mode == "rewrite"
+    if direct_cli:
+        print(_build_direct_output(prompt, improved, is_rewrite))
+        return
+
     additional = _build_additional(improved, source, is_rewrite)
     output = {
         "continue": True,

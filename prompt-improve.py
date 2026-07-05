@@ -2,7 +2,7 @@
 """Prompt-improve hook shim — delegates to the ``prompt_improve`` package (~/prompt-improve/).
 
 The package is ``pip install -e``'d, so ``import prompt_improve`` resolves from any
-CWD. This shim preserves the wired path ``~/.claude/hooks/improve-prompt.py`` so
+CWD. This shim preserves the wired path ``~/.claude/hooks/prompt-improve.py`` so
 ``~/.claude/settings.json`` keeps resolving untouched.
 
 Source of truth: ``~/prompt-improve/src/prompt_improve/``. History/changelog there.

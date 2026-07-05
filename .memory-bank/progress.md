@@ -1,5 +1,14 @@
 # Progress
 
+## 2026-07-05 (target-aware prompt profiles)
+- Verified current implementation against the CLI ecosystem: Claude Code shell functions in `.zshrc`, Codex external profiles (`gpt-5.4-mini`, `gpt-5.4`, `gpt-5.5`), and Antigravity/Gemini long-context bridge.
+- Confirmed target-aware routing exists in `features/target.py`: Claude -> XML tags, Codex/OpenAI GPT -> Markdown workflow/verification, Gemini/Antigravity -> component blocks, proxy models -> literal explicit steps.
+- Added regression tests for primary target families (Claude Opus/Sonnet/Fable, Codex GPT, Antigravity/Gemini) and proxy models (MiniMax, DeepSeek, GLM, Qwen), plus target-specific cache separation.
+- Added direct CLI output mode for `python3 ~/.claude/hooks/prompt-improve.py "prompt"` so shell wrappers receive plain improved text, not hook JSON.
+- Updated `.zshrc` wrappers `ec53`/`ec54` to set `PROMPT_IMPROVE_TARGET_CLI=codex` and the target GPT model before calling `enhance`.
+- Updated README with target profile behavior and env overrides.
+- Validation: `python3 -m pytest tests/ -q` -> 96/96 passing; `python3 -m py_compile` on changed source files passed.
+
 ## 2026-07-04 (codescan migration)
 - Migrated `codescan` from `~/.claude/scripts/codescan` (342L standalone) to `~/codescan/` vertical-slice project.
 - Cleaned stale `~/.claude/scripts/codeq-model-bench.py` (already in `~/codeq/scripts/`).
@@ -21,7 +30,7 @@
 - Split 1244L monolith into 12 modules (shared/ + features/ + command.py)
 - Added role-based model routing (_ROLE_MODEL_MAP)
 - Dropped HauhauCS-4b from default candidates
-- Installed shim at ~/.claude/hooks/improve-prompt.py
+- Installed shim at ~/.claude/hooks/prompt-improve.py
 - 49/49 tests passing
 - Logic review: 42/43 OK, 1 bug fixed (rewrite-then-clarify framing)
 - Initial git commit + bug fix commit
@@ -30,3 +39,4 @@
 - 2026-07-04T15:59:32Z | 2026-07-04 | Autonomous review commit bca8683: removed dead code (ordered_ollama_models + choose_ollama_model, both 0 refs), fixed fd leak in _spawn_ollama (extracted helper), applied ruff auto-fixes (PEP 604 types, datetime.UTC, collections.abc.Callable) across 9 files. Protect tests/compat.py shim via per-file-ignores (ruff was silently deleting re-exports). mypy clean, 31 tests pass.
 - 2026-07-04 | status:completed | Fallback-chain robustness + stale-defaults fix. (1) Shared `ollama_client.py`: split `OllamaRequestError` (HTTP 4xx/5xx, model-specific → continue) from `OllamaUnavailable` (daemon down → abort); fixed both `*_fallback` utils; added `<|channel>thought<channel|>` leak strip to `_strip_think_tags`. (2) prompt-improve `_run_ollama_models` catches `OllamaRequestError` → continues. (3) Default chain → deep_bench 2026-07-04 winners (Huihui→Qwopus3.5:9b→crow:9b→qwen3.5:4b), validated through real `clean_rewrite`. +3 regression tests (chain continues / aborts / skips-empty). ruff+mypy clean, 67 tests pass.
 - 2026-07-04 | status:completed | Ollama server UNIFICATION + cold-load robustness. Diagnosed two daemons (WSL + Windows) fighting for one GPU = VRAM-contention root cause. WSL was the real server (not Windows as believed). Updated WSL 0.23.2→0.31.1 (fixes LFM + `<|channel>` at source). Migrated the 1 Windows-unique model (zfujicute/OmniCoder-Qwen3.5-9B) via content-addressed blob copy + manifest `from` strip. systemd override (User=eldi, OLLAMA_MODELS=/home/eldi/.ollama/models) — installer default read an empty store. Windows ollama uninstalled + both Windows stores deleted. Built `bench_improve_real.py` (real-pipeline improve bench — supersedes deep_bench's improve column which missed `<|channel>`). Followup timeout fix: OLLAMA_TIMEOUT 20→45, fallback cap 30, chain cap 6, harness TimeoutError→continue. e2e `call_ollama_rewrite` verified on 0.31.1.
+- 2026-07-05T19:00:37Z | status:completed | 2026-07-05: Renamed active hook entrypoint references from prompt-improve.py to prompt-improve.py across Claude/Codex/Gemini/Antigravity configs and docs. Verified pytest tests/test_improve_prompt.py, py_compile for hooks, verify-hooks all CLIs, and direct NO_IMPROVE shim smokes.

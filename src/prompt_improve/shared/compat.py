@@ -1,8 +1,8 @@
 """Symlink-safe sys.path bootstrap + graceful imports of harness helpers.
 
 The prompt-improve hook is reached three ways:
-  1. Claude Code:  ``python3 ~/.claude/hooks/improve-prompt.py`` (the shim)
-  2. Codex/Gemini: ``~/.codex|gemini/hooks/improve-prompt.py`` -> symlink to shim
+  1. Claude Code:  ``python3 ~/.claude/hooks/prompt-improve.py`` (the shim)
+  2. Codex/Gemini: ``~/.codex|gemini/hooks/prompt-improve.py`` -> symlink to shim
   3. pytest:       ``import prompt_improve`` (installed via ``pip install -e``)
 
 The helpers ``ollama_client`` and ``cheap_complete`` live under
