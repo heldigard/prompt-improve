@@ -41,11 +41,29 @@ def available_ollama_models() -> list[str]:
 
 def _spawn_ollama() -> bool:
     """Launch ``ollama serve`` detached and record its pid. Best-effort."""
-    log = None
     try:
         os.makedirs(os.path.dirname(OLLAMA_LOG), exist_ok=True)
+    except OSError:
+        return False
+    proc = _launch_ollama_serve()
+    if proc is None:
+        return False
+    try:
+        with open(OLLAMA_PID, "w", encoding="utf-8") as f:
+            f.write(str(proc.pid))
+    except OSError:
+        return False
+    return True
+
+
+def _launch_ollama_serve() -> subprocess.Popen | None:  # type: ignore[type-arg]
+    """Start ollama serve with stdout redirected to the log file."""
+    try:
         log = open(OLLAMA_LOG, "ab")
-        proc = subprocess.Popen(
+    except OSError:
+        return None
+    try:
+        return subprocess.Popen(
             ["ollama", "serve"],
             stdout=log,
             stderr=subprocess.STDOUT,
@@ -53,16 +71,8 @@ def _spawn_ollama() -> bool:
             start_new_session=True,
         )
     except OSError:
-        if log is not None:
-            log.close()
-        return False
-    log.close()
-    try:
-        with open(OLLAMA_PID, "w", encoding="utf-8") as f:
-            f.write(str(proc.pid))
-    except OSError:
-        return False
-    return True
+        log.close()
+        return None
 
 
 def start_ollama_best_effort() -> bool:

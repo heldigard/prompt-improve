@@ -25,6 +25,8 @@ src/prompt_improve/
     rules/       rule-based suggestions, system prompts
     hints/       project hints, continuation context
   command.py     main() entry point
+scripts/
+  ollama-warmup.sh   best-effort Ollama warmup (SessionStart + cron)
 ```
 
 ## Conventions

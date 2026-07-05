@@ -24,16 +24,16 @@ OLLAMA_PID = os.path.expanduser("~/.ollama/ollama-serve.pid")
 # ---------------------------------------------------------------------------
 # Model candidates (global fallback)
 # ---------------------------------------------------------------------------
-# Default chain = deep_bench improve winners 2026-07-04 (validated through the
-# real clean_rewrite pipeline). Ordered by score: Huihui-abliterated (4.5, leaks
-# <|channel> tokens stripped at ollama_client source) → Qwopus3.5:9b (2.91) →
-# crow:9b (2.73) → qwen3.5:4b (2.19, universal anchor). The full available-model
-# tail is appended at runtime by choose_ollama_model_for_role, so this is
-# prioritization, not a hard dependency — missing models degrade gracefully.
+# Default chain = re-bench improve winners 2026-07-04 (Ollama 0.31.1, validated
+# through combined-rank of deep + tie-break). Ordered by combined rank:
+# pegasus912 (improve #1, gemma4-12B QAT heretic) → Librellama/gemma4:e2b
+# (improve #2 + codeq_sum #1) → qwen3.5:4b (universal anchor). The full
+# available-model tail is appended at runtime by choose_ollama_model_for_role,
+# so this is prioritization, not a hard dependency — missing models degrade
+# gracefully.
 _DEFAULT_IMPROVE_CHAIN = (
-    "hf.co/mradermacher/Huihui-gemma-4-12B-it-qat-q4_0-unquantized-abliterated-GGUF:Q4_K_M,"
-    "fredrezones55/Qwopus3.5:9b,"
-    "jaahas/crow:9b,"
+    "hf.co/pegasus912/gemma-4-12b-it-qat-heretic-ud-q4-k-xl:latest,"
+    "Librellama/gemma4:e2b-Uncensored,"
     "qwen3.5:4b"
 )
 
@@ -67,7 +67,6 @@ for _role, _default in [
 # ---------------------------------------------------------------------------
 CACHE_DIR = Path.home() / ".claude" / "cache" / "prompt-improve"
 CACHE_TTL_SECONDS = float(os.environ.get("OLLAMA_IMPROVE_CACHE_TTL", "300.0"))
-CACHE_DIR.mkdir(parents=True, exist_ok=True)
 CACHE_SCHEMA_VERSION = "prompt-improve-v17"
 
 # ---------------------------------------------------------------------------

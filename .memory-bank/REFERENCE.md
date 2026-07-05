@@ -1,15 +1,17 @@
 # REFERENCE - Stable Facts
 
-## Model benchmarks (2026-07-04 deep_bench — improve task, validated through clean_rewrite)
-- Primary: **hf.co/mradermacher/Huihui-gemma-4-12B-it-qat-q4_0-unquantized-abliterated-GGUF:Q4_K_M** (score 4.5; leaks `<|channel>` tokens, stripped at `ollama_client._strip_think_tags` source)
-- #2: **fredrezones55/Qwopus3.5:9b** (2.91, loads clean)
-- #3: **jaahas/crow:9b** (2.73, new)
-- Anchor fallback: **qwen3.5:4b** (2.19, universal — last in chain, always works)
-- Old winners superseded: `MobiusDevelopment/gemma-4-12B-it-qat` (couldn't load during bench — VRAM contention, blob valid), `batiai/gemma4-12b:q4` (quant-loser, was stale default).
-- Bench source: `/home/eldi/bench/ollama/RANKING.md` + `deep_bench.py` (5 tasks × 2 prompts; improve/codeq_sum/smart_trim/web_synth/code_gen). The real-pipeline improve bench is `bench_improve_real.py` (runs models through the ACTUAL `build_rewrite_system_prompt` + `clean_rewrite`; source of truth for routing — deep_bench's own scoring missed the `<|channel>` leak and false-ranked Huihui).
+## Model benchmarks (2026-07-04 re-bench — improve task, Ollama 0.31.1, combined-rank)
+- Primary: **hf.co/pegasus912/gemma-4-12b-it-qat-heretic-ud-q4-k-xl:latest** (improve #1; gemma-4-12B QAT heretic UD Q4_K_XL). Matches `shared/config.py::_DEFAULT_IMPROVE_CHAIN` + `~/ollama-bench/RANKING.md`.
+- #2: **Librellama/gemma4:e2b-Uncensored** (improve #2)
+- Anchor fallback: **qwen3.5:4b** (universal — last in chain, always works)
+- Chain in code: `pegasus912 → Librellama/gemma4:e2b → qwen3.5:4b` (all installed). Full available-model tail appended at runtime by `choose_ollama_model_for_role`; missing models degrade gracefully.
+- Superseded: `Huihui-gemma-4-12B-abliterated` (was primary in the OLD `~/bench/ollama/` bench; ranked outside top-5 in the 2026-07-04 re-bench and REMOVED from the host lineup — no longer a safe default). `MobiusDevelopment/gemma-4-12B-it-qat` (uninstalled, was codeq default — also superseded).
+- Bench source of truth: **`~/ollama-bench/RANKING.md`** (the vertical-slice successor to the old `~/bench/ollama/`).
 
-### Caveat: deep_bench leak-detector gap
-`deep_bench.score()` only flags `<think>`/`thinking process`/refusals — NOT `<|channel>`. So Huihui false-ranked #1 until validated through the real hook pipeline. Any new bench MUST run outputs through `prompt_improve.features.clean.clean_rewrite` to catch leaks deep_bench misses.
+### Caveat: leak-detector coverage (RESOLVED 2026-07-04)
+The OLD `deep_bench.score()` only flagged `<think>`/`thinking process`/refusals — NOT `<|channel>` turn-tokens (Gemma-4 abliterated merges leak `<|channel|>thought<|channel|>` in the answer field), which false-ranked Huihui #1 until validated through the real `clean_rewrite` pipeline.
+`ollama_client._strip_think_tags` strips `<|channel>` at runtime (preserved for any future channel-leaking model).
+The NEW `~/ollama-bench` scorer now ALSO detects `<|channel>` (added to `LEAK_PATTERNS` + `STRIPPABLE_TAGS`), closing the gap. New bench outputs no longer need the `clean_rewrite` re-check for this pattern.
 
 ## Dependencies
 - `ollama_client` — shared Ollama wrapper at `~/.claude/scripts/ollama_client.py`

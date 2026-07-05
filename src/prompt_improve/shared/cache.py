@@ -91,13 +91,12 @@ def load_cached(prompt: str, mode: str, cwd: str | None = None) -> tuple[str, st
         return None
 
 
-def save_cached(
-    prompt: str, mode: str, text: str, source: str, cwd: str | None = None
-) -> None:
+def save_cached(prompt: str, mode: str, text: str, source: str, cwd: str | None = None) -> None:
     if CACHE_TTL_SECONDS <= 0:
         return
     path = _cache_path(_cache_key(prompt, mode, cwd))
     try:
+        path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text(
             json.dumps({"text": text, "source": source}, ensure_ascii=False),
             encoding="utf-8",

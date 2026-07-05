@@ -17,6 +17,7 @@ is reachable. Run: `python3 -m pytest tests/ -q`
 from __future__ import annotations
 
 import importlib.util
+import io
 import json
 import os
 import sys
@@ -120,6 +121,18 @@ def test_rewrite_prompt_spanish_labels():
     prompt = ip.build_rewrite_system_prompt("Spanish")
     for label in ("Tarea", "Contexto", "Objetivo", "Restricciones", "Criterios de aceptación"):
         assert label in prompt
+
+
+def test_detect_language_matches_unaccented_spanish_markers():
+    # Bug fix 2026-07-04: prompt.lower() preserves accents, so a user typing
+    # "que" or "configuracion" (no accent) was missed by the old marker list.
+    assert ip.detect_language("que quieres hacer") == "Spanish"
+    assert ip.detect_language("configuracion del proyecto") == "Spanish"
+    # Sanity: accented variants still match.
+    assert ip.detect_language("qué quieres hacer") == "Spanish"
+    assert ip.detect_language("configuración del proyecto") == "Spanish"
+    # English stays English.
+    assert ip.detect_language("what do you want to do") == "English"
 
 
 def test_rewrite_prompt_forbids_user_questions_and_absolutes():
@@ -821,15 +834,15 @@ def test_choose_model_for_role_prefers_role_candidate():
     orig = omod.available_ollama_models
     omod.available_ollama_models = lambda: [
         "qwen3.5:4b",
-        "fredrezones55/Qwopus3.5:9b",
+        "Librellama/gemma4:e2b-Uncensored",
     ]
     orig_start = omod.start_ollama_best_effort
     omod.start_ollama_best_effort = lambda: True
     try:
         primary, fallbacks = omod.choose_ollama_model_for_role("prompt_rewrite")
         assert primary is not None
-        # Qwopus3.5:9b is ahead of qwen3.5:4b in the role chain → must win
-        assert "qwopus" in primary.lower()
+        # Librellama/gemma4:e2b-Uncensored is ahead of qwen3.5:4b in the role chain → must win
+        assert "gemma" in primary.lower()
         assert len(fallbacks) >= 1
     finally:
         omod.available_ollama_models = orig
@@ -1105,6 +1118,27 @@ def test_fallback_chain_skips_empty_then_succeeds():
     assert calls == ["primary_model", "second_model", "third_model"]
 
 
+def test_cloud_cascade_does_not_swallow_programmer_errors():
+    """Regression 2026-07-04: narrow exception list must NOT catch NameError /
+    AttributeError. Those are programmer bugs that should surface, not silently
+    fall through to the rule-based fallback."""
+    import prompt_improve.features.improve as imod
+    import prompt_improve.shared.config as cfg
+
+    def boom(**_):
+        raise NameError("cheap_llm misconfigured — NOT a transient failure")
+
+    cfg.CLOUD_FALLBACK = True
+    imod.CLOUD_FALLBACK = True
+    old = imod.compat.cheap_complete
+    imod.compat.cheap_complete = boom
+    try:
+        with __import__("pytest").raises(NameError):
+            imod.call_cloud_cascade("fix the bug", "rewrite")
+    finally:
+        imod.compat.cheap_complete = old
+
+
 # ---- unittest fallback (run without pytest) --------------------------------
 
 
@@ -1124,3 +1158,96 @@ def _run_all() -> int:
 
 if __name__ == "__main__":
     sys.exit(_run_all())
+
+
+# ---- command.main end-to-end (UserPromptSubmit hook) --------------------
+
+
+def _run_main_via_stdin(prompt: str, cwd: str | None = None, env: dict | None = None):
+    """Drive command.main() as if invoked by Claude Code's hook runtime."""
+    from prompt_improve import command
+
+    payload = {"prompt": prompt}
+    if cwd is not None:
+        payload["cwd"] = cwd
+    stdin_bytes = json.dumps(payload).encode("utf-8")
+    saved_stdin = sys.stdin
+    saved_stdout = sys.stdout
+    saved_env = {
+        k: os.environ.get(k)
+        for k in (
+            "NO_DELEGATE",
+            "NO_IMPROVE",
+            "CODEX_WORKER",
+            "SWARM_WORKER",
+        )
+    }
+    try:
+        sys.stdin = io.BytesIO(stdin_bytes)
+        sys.stdout = io.StringIO()
+        if env:
+            for k, v in env.items():
+                os.environ[k] = v
+                os.environ.pop(k, None) if v is None else None
+        command.main()
+        return sys.stdout.getvalue()
+    finally:
+        sys.stdin = saved_stdin
+        sys.stdout = saved_stdout
+        for k, v in saved_env.items():
+            if v is None:
+                os.environ.pop(k, None)
+            else:
+                os.environ[k] = v
+
+
+def test_command_main_passthrough_on_no_improve_marker():
+    """[NO_IMPROVE] bypasses everything — emits a bare continue=true."""
+    out = _run_main_via_stdin("implement the feature", env={"NO_IMPROVE": "1"})
+    assert json.loads(out) == {"continue": True}
+
+
+def test_command_main_passthrough_on_trivial_prompt():
+    """Short acknowledgments must not invoke the LLM."""
+    out = _run_main_via_stdin("ok thanks")
+    assert json.loads(out) == {"continue": True}
+
+
+def test_command_main_falls_through_when_no_model_available():
+    """When LLM fails AND rule fallback yields nothing, emit bare continue."""
+    # "asdfgh" with no TASK_VERBS and no Spanish markers — rule-based yields
+    # nothing and we mock call_ollama_rewrite to return None (cold/dead daemon).
+    import prompt_improve.command as cmd
+
+    orig = cmd.route_and_improve
+    cmd.route_and_improve = lambda _p, _mode, _cwd=None: None
+    try:
+        out = _run_main_via_stdin("asdfgh qwerty", cwd="/nonexistent")
+    finally:
+        cmd.route_and_improve = orig
+    # Either bare continue (no improvement available) or hint — but never raises.
+    parsed = json.loads(out)
+    assert parsed.get("continue") is True
+
+
+def test_command_main_emits_additional_context_on_rewrite():
+    """Happy path: rewrite mode routes through an LLM, wraps the output as
+    hookSpecificOutput.additionalContext (NOT a user-facing question)."""
+    import prompt_improve.command as cmd
+
+    def fake_route(_prompt, _mode, _cwd=None):
+        return ("Tarea: Hacer X.\n\nContexto: y.", "ollama:fake", "rewrite")
+
+    orig = cmd.route_and_improve
+    cmd.route_and_improve = fake_route
+    # "implementa la funcion foo" passes detect_trivial (matches TASK_VERBS)
+    # and avoids has_concrete_target (no file/path substring).
+    try:
+        out = _run_main_via_stdin("implementa la funcion foo", cwd="/nonexistent")
+    finally:
+        cmd.route_and_improve = orig
+    parsed = json.loads(out)
+    ctx = parsed["hookSpecificOutput"]["additionalContext"]
+    assert "[Prompt expandido" in ctx
+    assert "fake" in ctx
+    assert "Tarea" in ctx

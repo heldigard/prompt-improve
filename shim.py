@@ -8,6 +8,7 @@ CWD. This shim preserves the wired path ``~/.claude/hooks/improve-prompt.py`` so
 Source of truth: ``~/prompt-improve/src/prompt_improve/``. History/changelog there.
 If the package ever fails to import, fail OPEN (never block prompt submission).
 """
+
 import sys
 
 try:

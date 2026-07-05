@@ -27,9 +27,7 @@ def _build_additional(improved: str, source: str, is_rewrite: bool) -> str:
     return f"[Mejora de prompt: {source}]\n\n{improved}"
 
 
-def _try_improve(
-    prompt: str, mode: str, cwd: str | None
-) -> tuple[str | None, str, str]:
+def _try_improve(prompt: str, mode: str, cwd: str | None) -> tuple[str | None, str, str]:
     """Try LLM improvement, then rule-based fallback.
 
     Returns (improved, source, effective_mode). The effective_mode may differ

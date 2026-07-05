@@ -3,6 +3,8 @@
 
 from __future__ import annotations
 
+import os
+import sys
 from collections.abc import Callable
 
 from prompt_improve.features.classify import needs_cloud_intelligence
@@ -14,6 +16,13 @@ from prompt_improve.shared.cache import load_cached, save_cached
 from prompt_improve.shared.config import CLOUD_FALLBACK, OLLAMA_TIMEOUT, OLLAMA_URL
 from prompt_improve.shared.ollama import choose_ollama_model_for_role
 from prompt_improve.shared.paths import project_hint_for_prompt
+
+_DEBUG = os.environ.get("OLLAMA_IMPROVE_DEBUG", "0") == "1"
+
+
+def _debug(msg: str) -> None:
+    if _DEBUG:
+        print(f"[prompt-improve] {msg}", file=sys.stderr)
 
 
 def _run_ollama_models(
@@ -31,15 +40,18 @@ def _run_ollama_models(
 ) -> tuple[str, str] | None:
     """Try role-specific Ollama models in order. Returns (cleaned, source) or None."""
     if compat.ollama_client is None:
+        _debug("ollama_client not available")
         return None
     primary, fallbacks = choose_ollama_model_for_role(role)
     if not primary:
+        _debug(f"no model available for role={role}")
         return None
     # Cap the chain (primary + 5 fallbacks) so a slow/hung daemon can't walk the
     # full available-model tail (60+) — bounds worst-case latency before the
     # cloud fallback kicks in. The role map's explicit candidates come first, so
     # the cap rarely truncates a preferred model.
     models = ([primary] + fallbacks)[:6]
+    _debug(f"role={role} chain={[m.split(':')[0] for m in models]}")
     for index, model in enumerate(models):
         timeout = timeout_first if index == 0 else timeout_fallback
         try:
@@ -55,19 +67,45 @@ def _run_ollama_models(
                 num_ctx=num_ctx,
             )
         except compat.ollama_client.OllamaRequestError:
-            # Model-specific failure (load failure, OOM, 404) — VRAM contention
-            # makes this common with many models installed. Try the next fallback;
-            # do NOT abort the whole chain (only daemon-down does that).
+            _debug(f"  model={model} load-fail (VRAM/OOM), trying next")
             continue
         except compat.ollama_client.OllamaUnavailable:
+            _debug("daemon down, aborting chain")
             return None
         if not content:
+            _debug(f"  model={model} returned empty")
             continue
         cleaned = cleaner(content, prompt)
         if cleaned:
+            _debug(f"  model={model} OK ({len(cleaned)} chars)")
             save_cached(prompt, cache_mode, cleaned, f"ollama:{model}", cwd)
             return cleaned, f"ollama:{model}"
+        _debug(f"  model={model} cleaner rejected output")
+    _debug(f"exhausted chain for role={role}")
     return None
+
+
+def _build_messages(mode: str, prompt: str, cwd: str | None) -> tuple[str, str]:
+    """Compose (system_prompt, user_message) for a given mode.
+
+    Shared across call_ollama / call_ollama_rewrite / call_cloud_cascade so the
+    language hint + project anchor stay in one place. Returns plain (system, user)
+    strings; the caller wraps them in the chat-message shape its backend expects.
+    """
+    language = detect_language(prompt)
+    hint = project_hint_for_prompt(prompt, cwd)
+    hint_line = f"Project context: {hint}\n" if hint else ""
+    if mode == "rewrite":
+        system = build_rewrite_system_prompt(language)
+        user = f"Respond and write the rewritten prompt in {language}.\n{hint_line}\nOriginal prompt:\n{prompt}"
+    else:
+        system = SYSTEM_PROMPT
+        user = (
+            f"Respond in {language}.\n{hint_line}\nOriginal prompt:\n{prompt}\n\n"
+            "What should the agent DO or VERIFY before executing? "
+            "(actions it can take with its tools — not questions for the user)"
+        )
+    return system, user
 
 
 def call_ollama(prompt: str, cwd: str | None = None) -> tuple[str, str] | None:
@@ -75,21 +113,8 @@ def call_ollama(prompt: str, cwd: str | None = None) -> tuple[str, str] | None:
     cached = load_cached(prompt, "clarify", cwd)
     if cached:
         return cached
-    language = detect_language(prompt)
-    hint = project_hint_for_prompt(prompt, cwd)
-    messages = [
-        {"role": "system", "content": SYSTEM_PROMPT},
-        {
-            "role": "user",
-            "content": (
-                f"Respond in {language}.\n"
-                + (f"Project context: {hint}\n" if hint else "")
-                + f"\nOriginal prompt:\n{prompt}\n\n"
-                "What should the agent DO or VERIFY before executing? "
-                "(actions it can take with its tools — not questions for the user)"
-            ),
-        },
-    ]
+    system, user = _build_messages("clarify", prompt, cwd)
+    messages = [{"role": "system", "content": system}, {"role": "user", "content": user}]
     return _run_ollama_models(
         "prompt_clarify",
         messages,
@@ -110,19 +135,8 @@ def call_ollama_rewrite(prompt: str, cwd: str | None = None) -> tuple[str, str] 
     cached = load_cached(prompt, "rewrite", cwd)
     if cached:
         return cached
-    language = detect_language(prompt)
-    hint = project_hint_for_prompt(prompt, cwd)
-    messages = [
-        {"role": "system", "content": build_rewrite_system_prompt(language)},
-        {
-            "role": "user",
-            "content": (
-                f"Respond and write the rewritten prompt in {language}.\n"
-                + (f"Project context: {hint}\n" if hint else "")
-                + f"\nOriginal prompt:\n{prompt}"
-            ),
-        },
-    ]
+    system, user = _build_messages("rewrite", prompt, cwd)
+    messages = [{"role": "system", "content": system}, {"role": "user", "content": user}]
     return _run_ollama_models(
         "prompt_rewrite",
         messages,
@@ -147,23 +161,7 @@ def call_cloud_cascade(
     """Cloud via cheap_llm cascade (cross-provider failover)."""
     if not CLOUD_FALLBACK or compat.cheap_complete is None:
         return None
-    language = detect_language(prompt)
-    hint = project_hint_for_prompt(prompt, cwd)
-    if mode == "rewrite":
-        system = build_rewrite_system_prompt(language)
-        user = (
-            f"Respond and write the rewritten prompt in {language}.\n"
-            + (f"Project context: {hint}\n" if hint else "")
-            + f"\nOriginal prompt:\n{prompt}"
-        )
-    else:
-        system = SYSTEM_PROMPT
-        user = (
-            f"Respond in {language}.\n"
-            + (f"Project context: {hint}\n" if hint else "")
-            + f"\nOriginal prompt:\n{prompt}\n\n"
-            "What should the agent DO or VERIFY before executing?"
-        )
+    system, user = _build_messages(mode, prompt, cwd)
     try:
         result = compat.cheap_complete(
             system=system,
@@ -174,7 +172,10 @@ def call_cloud_cascade(
             require_json=False,
             cloud_model=cloud_model,
         )
-    except Exception:
+    except (OSError, ValueError, TypeError, KeyError):
+        # Transient/network/data-shape failures from the cloud cascade — fail OPEN
+        # (return None → caller falls back to local). Programmer errors (NameError,
+        # AttributeError) intentionally bubble up so they surface in tests.
         return None
     text = (result.get("text") or "").strip() if isinstance(result, dict) else ""
     if not text:
@@ -182,7 +183,7 @@ def call_cloud_cascade(
     text = clean_rewrite(text, prompt) if mode == "rewrite" else clean_response(text, prompt)
     if not text:
         return None
-    model = result.get("model") or "cloud" if isinstance(result, dict) else "cloud"
+    model = (result.get("model") or "cloud") if isinstance(result, dict) else "cloud"
     return text, f"cloud:{model}"
 
 

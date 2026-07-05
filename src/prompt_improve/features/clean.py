@@ -31,7 +31,9 @@ def trim_bullet(line: str, limit: int = 180) -> str:
 
 
 def remove_long_examples(line: str) -> str:
-    shortened = re.sub(r"\s*\((?:por ejemplo|e\.g\.|for example),[^)]*\)", "", line, flags=re.IGNORECASE)
+    shortened = re.sub(
+        r"\s*\((?:por ejemplo|e\.g\.|for example),[^)]*\)", "", line, flags=re.IGNORECASE
+    )
     return shortened if len(shortened) < len(line) else line
 
 

@@ -36,7 +36,11 @@ def build_rewrite_system_prompt(language: str) -> str:
     """Language-aware rewrite system prompt."""
     if language == "Spanish":
         task_kw, ctx, obj, constr, accept = (
-            "Tarea", "Contexto", "Objetivo", "Restricciones", "Criterios de aceptación",
+            "Tarea",
+            "Contexto",
+            "Objetivo",
+            "Restricciones",
+            "Criterios de aceptación",
         )
         agent_note = (
             "Si la intención es genuinamente ambigua, añade una línea 'Nota para el "
@@ -45,7 +49,11 @@ def build_rewrite_system_prompt(language: str) -> str:
         absolutes = "objetivos numéricos absolutos (ej. '100% cobertura', 'cero downtime')"
     else:
         task_kw, ctx, obj, constr, accept = (
-            "Task", "Context", "Objective", "Constraints", "Acceptance criteria",
+            "Task",
+            "Context",
+            "Objective",
+            "Constraints",
+            "Acceptance criteria",
         )
         agent_note = (
             "If intent is genuinely ambiguous, add an 'Agent note:' line stating what "
@@ -78,18 +86,51 @@ def build_rewrite_system_prompt(language: str) -> str:
     )
 
 
+def _task_before_fenced_code(prompt: str) -> bool:
+    """True when the prompt has a task verb BEFORE a fenced code block.
+
+    The LLM rewrites this kind of prompt better when the task follows the
+    source code; surfacing the suggestion nudges the caller to reorder.
+    """
+    if "```" not in prompt or len(prompt) <= 300:
+        return False
+    if not re.search(r"```[\s\S]+?```", prompt):
+        return False
+    code_pos = prompt.find("```")
+    if code_pos <= 0:
+        return False
+    return (
+        re.search(
+            r"\b(implement|create|build|fix|refactor|explica|revisa|arregla)\b",
+            prompt[:code_pos],
+            re.IGNORECASE,
+        )
+        is not None
+    )
+
+
 def rule_based_suggestions(prompt: str) -> str | None:
     """Static heuristic suggestions as last-resort fallback."""
     p = prompt.lower()
     suggestions = []
 
     if re.search(r"\b(skill|agente|subagent|swarm|busca|search|investiga|audit|revisa toda)\b", p):
-        if not re.search(r"\b(scope|alcance|criterio|formato de salida|output format|presupuesto|budget)\b", p):
-            suggestions.append("Define el alcance, el formato de salida esperado y los criterios de éxito para el skill/agente/swarm.")
+        if not re.search(
+            r"\b(scope|alcance|criterio|formato de salida|output format|presupuesto|budget)\b", p
+        ):
+            suggestions.append(
+                "Define el alcance, el formato de salida esperado y los criterios de éxito para el skill/agente/swarm."
+            )
 
-    if re.search(r"\b(memory bank|memoria|recuerda|\.memory-bank|activeContext|systemPatterns)\b", p):
-        if not re.search(r"\b(project|proyecto|topic|tema|decisión|decision|progreso|progress)\b", p):
-            suggestions.append("Especifica el proyecto/tema y qué tipo de memoria debe actualizarse (decisión, progreso, contexto activo).")
+    if re.search(
+        r"\b(memory bank|memoria|recuerda|\.memory-bank|activeContext|systemPatterns)\b", p
+    ):
+        if not re.search(
+            r"\b(project|proyecto|topic|tema|decisión|decision|progreso|progress)\b", p
+        ):
+            suggestions.append(
+                "Especifica el proyecto/tema y qué tipo de memoria debe actualizarse (decisión, progreso, contexto activo)."
+            )
 
     if re.search(r"\b(fix|arregla|debug|solve|resuelve|help|check)\b", p):
         has_target = re.search(r"\b(file|archivo|function|función|class|line|línea|error|bug)\b", p)
@@ -114,18 +155,25 @@ def rule_based_suggestions(prompt: str) -> str | None:
             suggestions.append("Incluye el mensaje de error o traceback si lo tienes.")
 
     if len(prompt) > 400 and "\n" in prompt:
-        if not re.search(r"^\s*(task|contexto|context|fuente|source|restricciones|constraints|output|salida|format)\s*[:|\-]", prompt, re.IGNORECASE | re.MULTILINE):
-            suggestions.append("Estructura con secciones planas: Task / Context / Source / Constraints / Output format.")
+        if not re.search(
+            r"^\s*(task|contexto|context|fuente|source|restricciones|constraints|output|salida|format)\s*[:|\-]",
+            prompt,
+            re.IGNORECASE | re.MULTILINE,
+        ):
+            suggestions.append(
+                "Estructura con secciones planas: Task / Context / Source / Constraints / Output format."
+            )
 
     if re.search(r"\b(refactor|analyze|analyz|review|revisar|audit)\b", p):
         if not re.search(r"\b(if (unknown|missing)|si (falta|desconocido)|no aplica)\b", p):
-            suggestions.append("Define qué debe responder el agente si la fuente de verdad no está disponible.")
+            suggestions.append(
+                "Define qué debe responder el agente si la fuente de verdad no está disponible."
+            )
 
-    if "```" in prompt and len(prompt) > 300 and re.search(r"```[\s\S]+?```", prompt):
-        code_pos = prompt.find("```")
-        task_match = re.search(r"\b(implement|create|build|fix|refactor|explica|revisa|arregla)\b", prompt[:code_pos] if code_pos > 0 else prompt, re.IGNORECASE)
-        if task_match and code_pos > 0 and task_match.start() < code_pos:
-            suggestions.append("Coloca la tarea DESPUÉS del material fuente para mejor calidad de respuesta.")
+    if _task_before_fenced_code(prompt):
+        suggestions.append(
+            "Coloca la tarea DESPUÉS del material fuente para mejor calidad de respuesta."
+        )
 
     if not suggestions:
         return None

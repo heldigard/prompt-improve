@@ -15,13 +15,33 @@ from prompt_improve.shared.paths import _BARE_CONTINUATION_RE
 
 
 def detect_language(prompt: str) -> str:
+    """Heuristic Spanish/English detector. Both accented and unaccented markers match."""
     p = prompt.lower()
-    spanish_markers = [
-        "arregla", "revisa", "corrige", "continua", "implementa",
-        "mejora", "mejorar", "prueba", "pruebas", "casos", "funcione",
-        "archivo", "configuracion", "configuración", "seguridad",
-        "qué", "como", "cómo",
-    ]
+    # Markers ship in BOTH accented and unaccented forms: lower() preserves accents,
+    # so a user typing "que quieres" or "configuracion" (no accent) would be
+    # missed if we only listed "qué" / "configuración". Listing both is simpler
+    # than running unicodedata on every input.
+    spanish_markers = (
+        "arregla",
+        "revisa",
+        "corrige",
+        "continua",
+        "implementa",
+        "mejora",
+        "mejorar",
+        "prueba",
+        "pruebas",
+        "casos",
+        "funcione",
+        "archivo",
+        "configuracion",
+        "configuración",
+        "seguridad",
+        "que",
+        "qué",
+        "como",
+        "cómo",
+    )
     if any(marker in p for marker in spanish_markers) or re.search(r"[áéíóúñ¿¡]", p):
         return "Spanish"
     return "English"
@@ -29,11 +49,7 @@ def detect_language(prompt: str) -> str:
 
 def has_concrete_target(prompt: str) -> bool:
     """True when a short prompt already names a concrete file/path AND an action verb."""
-    has_path = (
-        bool(_CONCRETE_FILE_RE.search(prompt))
-        or "/" in prompt
-        or "\\" in prompt
-    )
+    has_path = bool(_CONCRETE_FILE_RE.search(prompt)) or "/" in prompt or "\\" in prompt
     return has_path and bool(_CONCRETE_ACTION_RE.search(prompt))
 
 
@@ -50,9 +66,12 @@ def detect_trivial(prompt: str) -> bool:
     ]
     if any(re.match(t, p) for t in trivial_exact):
         return True
-    if len(p) < 24 and not re.search(r"[\/\\]", p) and not re.search(
-        r"\.(py|ts|tsx|js|jsx|java|go|rs|rb|json|toml|yml|yaml|md)\b", p
-    ) and not TASK_VERBS_RE.search(p):
+    if (
+        len(p) < 24
+        and not re.search(r"[\/\\]", p)
+        and not re.search(r"\.(py|ts|tsx|js|jsx|java|go|rs|rb|json|toml|yml|yaml|md)\b", p)
+        and not TASK_VERBS_RE.search(p)
+    ):
         return True
     return len(p) < 6
 

@@ -1,5 +1,21 @@
 # Progress
 
+## 2026-07-04 (codescan migration)
+- Migrated `codescan` from `~/.claude/scripts/codescan` (342L standalone) to `~/codescan/` vertical-slice project.
+- Cleaned stale `~/.claude/scripts/codeq-model-bench.py` (already in `~/codeq/scripts/`).
+- Moved `~/.claude/scripts/update-ctags.sh` → `~/codeq/scripts/`.
+- Shims updated: `~/.claude/scripts/codescan` (20L) + `~/.claude/tests/test-codescan.py` (15L).
+- All 5 sensors verified, ruff clean, smoke test passed.
+
+## 2026-07-04 (maintenance round — autonomous review session)
+- ruff format: 7 files (auto-format.sh had backlog). All clean now.
+- Bug fix `features/detect.py::detect_language`: "que" / "configuracion" (no accent) missed Spanish detection. Added unaccented marker variants. +1 regression test.
+- Bug fix `features/improve.py::call_cloud_cascade`: narrowed `except Exception` → `(OSError, ValueError, TypeError, KeyError)`. Programmer errors (NameError/AttributeError) now surface. +1 regression test (NameError must raise, not be swallowed).
+- Bug fix `features/rules.py::_task_before_fenced_code`: extracted from inline nested logic — was nesting depth 5; helper + guard clauses = depth 2.
+- Refactor `features/improve.py`: extracted `_build_messages(mode, prompt, cwd)` shared across call_ollama / call_ollama_rewrite / call_cloud_cascade. ~25 lines of duplicated message-formatting collapsed.
+- 4 new end-to-end tests for `command.main()`: NO_IMPROVE passthrough, trivial prompt passthrough, no-model fallthrough, rewrite happy-path. Now exercises the actual hook entry point (not just pieces).
+- Total: 73/73 tests passing, ruff check + format clean, vertical-slice guard clean.
+
 ## 2026-07-04
 - Created ~/prompt-improve/ project with vertical-slice layout
 - Split 1244L monolith into 12 modules (shared/ + features/ + command.py)

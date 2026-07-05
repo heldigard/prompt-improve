@@ -3,6 +3,7 @@
 Tests import this as ``ip`` to get the same interface as the old
 ``improve-prompt.py`` hook module.
 """
+
 from prompt_improve.shared.config import (  # noqa: F401
     OLLAMA_MODEL_CANDIDATES,
     _ROLE_MODEL_MAP,
@@ -55,4 +56,9 @@ from prompt_improve.features.improve import (  # noqa: F401
 )
 
 # Attribute-style access aliases (tests use ip._project_hint, ip._cache_key, etc.)
-__file__ = str(__import__("pathlib").Path(__file__).resolve().parent.parent / "src" / "prompt_improve" / "__init__.py")
+__file__ = str(
+    __import__("pathlib").Path(__file__).resolve().parent.parent
+    / "src"
+    / "prompt_improve"
+    / "__init__.py"
+)
