@@ -1,4 +1,12 @@
-"""Target CLI/model detection and prompt-shape guidance."""
+"""Target CLI/model detection.
+
+The "how" axis of target-awareness: given a hook payload + environment, infer
+which CLI/model will receive the improved prompt and classify it into a family.
+
+This module is imperative parsing/matching logic — it changes when detection
+inputs or protocols change (new env var, new payload shape, new CLI). It knows
+nothing about HOW to phrase prompts for each family; that lives in `shape.py`.
+"""
 
 from __future__ import annotations
 
@@ -9,7 +17,13 @@ from dataclasses import dataclass
 
 @dataclass(frozen=True)
 class TargetProfile:
-    """The agent/model that will receive the improved prompt."""
+    """The agent/model that will receive the improved prompt.
+
+    `family` is the dispatch key into the prompt-shape registry (`shape.py`).
+    `style` is an informative human-readable label (also folded into cache_key);
+    it is NOT a dispatch key. `version` is best-effort extracted from the model
+    string, used for cache partitioning.
+    """
 
     cli: str
     model: str
@@ -62,7 +76,11 @@ def target_profile_from_request(data: dict | None = None) -> TargetProfile:
 
 
 def profile_for_model(model: str, cli: str | None = None) -> TargetProfile:
-    """Classify a model string into a prompt formatting family."""
+    """Classify a model string into a family + style label.
+
+    The family is the dispatch key consumed by `shape.target_guidance`. The
+    style is a descriptive label only.
+    """
     clean_model = model.strip() or "unknown"
     lower = clean_model.lower()
     clean_cli = (cli or _cli_from_env_or_model(clean_model) or "generic").lower()
@@ -70,7 +88,9 @@ def profile_for_model(model: str, cli: str | None = None) -> TargetProfile:
     if _looks_like_claude(lower):
         return TargetProfile(clean_cli, clean_model, "claude", _version(lower), "xml-tags")
     if _looks_like_openai(lower) or clean_cli == "codex":
-        return TargetProfile(clean_cli, clean_model, "openai-gpt", _version(lower), "codex-markdown")
+        return TargetProfile(
+            clean_cli, clean_model, "openai-gpt", _version(lower), "codex-markdown"
+        )
     if _looks_like_gemini(lower) or clean_cli in {"agy", "antigravity", "gemini"}:
         return TargetProfile(clean_cli, clean_model, "gemini", _version(lower), "component-blocks")
     if _looks_like_qwen(lower):
@@ -90,94 +110,7 @@ def profile_for_model(model: str, cli: str | None = None) -> TargetProfile:
     return TargetProfile(clean_cli, clean_model, "generic", _version(lower), "plain-markdown")
 
 
-def target_guidance(target: TargetProfile, mode: str, language: str) -> str:
-    """Prompt-shape instructions for the target model family."""
-    if target.family == "claude":
-        return _claude_guidance(mode, language)
-    if target.family == "openai-gpt":
-        return _openai_guidance(mode, language)
-    if target.family == "gemini":
-        return _gemini_guidance(mode, language)
-    if target.family in {"qwen", "deepseek", "glm", "minimax", "kimi", "mimo"}:
-        return _literal_guidance(mode)
-    if target.family == "gemma":
-        return _compact_guidance(mode)
-    return _generic_guidance(mode)
-
-
-def _claude_guidance(mode: str, language: str) -> str:
-    labels = "Spanish labels" if language == "Spanish" else "English labels"
-    if mode == "rewrite":
-        return (
-            "Target model profile: Claude family. Output the rewritten prompt with "
-            "short XML-style sections using stable tags such as <task>, <context>, "
-            "<constraints>, and <acceptance>. Keep human-visible text in the user's "
-            f"language ({labels}). Put context before the final task when source "
-            "material is present. Do not wrap the whole answer in markdown fences."
-        )
-    return (
-        "Target model profile: Claude family. Use concise bullets and, where a "
-        "bullet names separate material, prefer XML tag names like <context> or "
-        "<acceptance> so Claude can parse instructions, context, and input cleanly."
-    )
-
-
-def _openai_guidance(mode: str, language: str) -> str:
-    if mode == "rewrite":
-        return (
-            "Target model profile: OpenAI GPT/Codex. Output clean Markdown sections "
-            "with explicit role/workflow guidance, concrete tool-use or verification "
-            "steps when inferable, and backticks around file paths/functions/classes. "
-            "Separate instructions from the user's original input; do not use XML."
-        )
-    return (
-        "Target model profile: OpenAI GPT/Codex. Use 1-3 Markdown bullets that "
-        "name concrete actions, verification, and any TODO/planning need. Use "
-        "backticks for paths/functions/classes. Do not use XML."
-    )
-
-
-def _gemini_guidance(mode: str, language: str) -> str:
-    if mode == "rewrite":
-        return (
-            "Target model profile: Gemini/Antigravity. Output clearly labeled "
-            "component blocks: Objective, Instructions, Context, Constraints, and "
-            "Output format, using only blocks that are inferable. Keep the user's "
-            "source/context before the final request when present, and use simple "
-            "delimiters instead of XML."
-        )
-    return (
-        "Target model profile: Gemini/Antigravity. Use component-style bullets that "
-        "separate objective, instruction, context, and output/verification format."
-    )
-
-
-def _literal_guidance(mode: str) -> str:
-    if mode == "rewrite":
-        return (
-            "Target model profile: literal instruction follower. Use direct, "
-            "numbered or plainly labeled Markdown. Avoid implicit intent, hidden "
-            "assumptions, and broad discretionary language."
-        )
-    return (
-        "Target model profile: literal instruction follower. Make each bullet a "
-        "direct action or verification step with minimal ambiguity."
-    )
-
-
-def _compact_guidance(mode: str) -> str:
-    if mode == "rewrite":
-        return (
-            "Target model profile: compact local model. Keep the output short, flat, "
-            "and strongly labeled. Avoid nested structure and long explanations."
-        )
-    return "Target model profile: compact local model. Keep bullets short and concrete."
-
-
-def _generic_guidance(mode: str) -> str:
-    if mode == "rewrite":
-        return "Target model profile: generic. Use clear, flat Markdown sections."
-    return "Target model profile: generic. Use concise action bullets."
+# ---- payload / env parsing -------------------------------------------------
 
 
 def _model_from_payload(data: dict) -> str | None:
@@ -238,6 +171,9 @@ def _first_text(*values: object) -> str | None:
     return None
 
 
+# ---- family matchers -------------------------------------------------------
+
+
 def _looks_like_claude(text: str) -> bool:
     return any(token in text for token in ("claude", "sonnet", "opus", "haiku", "fable", "mythos"))
 
@@ -276,6 +212,9 @@ def _looks_like_glm(text: str) -> bool:
 
 def _looks_like_gemma(text: str) -> bool:
     return "gemma" in text
+
+
+# ---- helpers ---------------------------------------------------------------
 
 
 def _version(text: str) -> str:

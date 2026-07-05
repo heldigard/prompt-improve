@@ -1399,6 +1399,107 @@ def test_cache_mode_is_target_specific():
     assert m._cache_mode("rewrite", claude) != m._cache_mode("rewrite", codex)
 
 
+# ---- per-family behavior hints (failure-mode mitigations) -------------------
+#
+# Regression guard for the semantic bug where 6 families (qwen, deepseek, glm,
+# minimax, kimi, mimo) previously shared the identical `_literal_guidance` text.
+# Each family must now emit DISTINCT format guidance AND its own behavior keyword.
+
+_FAMILY_CASES = [
+    ("claude", "claude-opus-4-8", "claude"),
+    ("openai-gpt", "gpt-5.5", "codex"),
+    ("gemini", "Gemini 3.5 Flash (High)", "antigravity"),
+    ("qwen", "qwen3.7-max[1m]", "qwen"),
+    ("deepseek", "deepseek-v4-pro[1m]", "dseek"),
+    ("glm", "glm-5.2[1m]", "zai"),
+    ("minimax", "MiniMax-M3[1m]", "mini"),
+    ("kimi", "kimi-2.7-code", "kimi"),
+    ("mimo", "mimo-2.5-pro", "mimo"),
+    ("gemma", "gemma-4-12b-it-qat", "generic"),
+]
+
+
+def test_target_guidance_distinct_per_family():
+    """No two families may share the same rewrite guidance signature."""
+    from prompt_improve.features.target import profile_for_model, target_guidance
+
+    sigs = {}
+    for family, model, cli in _FAMILY_CASES:
+        target = profile_for_model(model, cli)
+        assert target.family == family
+        sigs[family] = target_guidance(target, "rewrite", "English")[:60]
+    duplicates = [k for k, v in sigs.items() if list(sigs.values()).count(v) > 1]
+    assert not duplicates, f"families share guidance signatures: {duplicates}"
+
+
+def test_behavior_hints_present_per_family():
+    """Each family's characteristic failure-mode keyword must appear in guidance."""
+    from prompt_improve.features.target import profile_for_model, target_guidance
+
+    behavior_keywords = {
+        "qwen": "failed command",
+        "glm": "PATH",
+        "minimax": "exploration loop",
+        "kimi": "subagent",
+        "deepseek": "reasoning",
+        "mimo": "sequential",
+        "claude": "over-exploration",
+        "openai-gpt": "FILES",
+        "gemini": "dilutes focus",
+    }
+    family_to_case = {f: (m, c) for f, m, c in _FAMILY_CASES}
+    for family, keyword in behavior_keywords.items():
+        model, cli = family_to_case[family]
+        guidance = target_guidance(profile_for_model(model, cli), "rewrite", "English")
+        assert keyword in guidance, f"{family} missing behavior keyword {keyword!r}"
+
+
+def test_generic_family_has_no_behavior_mitigation():
+    """Generic is the unprofiled fallback — it must not inject a fake mitigation."""
+    from prompt_improve.features.target import profile_for_model, target_guidance
+
+    target = profile_for_model("some-unknown-model-xyz", "generic")
+    guidance = target_guidance(target, "rewrite", "English")
+    assert "Mitigation" not in guidance
+
+
+def test_clarify_mode_also_includes_behavior():
+    """Behavior mitigations apply in clarify mode too (a model's pattern is mode-independent)."""
+    from prompt_improve.features.target import profile_for_model, target_guidance
+
+    target = profile_for_model("qwen3.7-max[1m]", "qwen")
+    clarify = target_guidance(target, "clarify", "English")
+    assert "failed command" in clarify
+
+
+def test_language_label_substituted_in_claude_rewrite():
+    """Claude rewrite template substitutes {labels} with the user's language."""
+    from prompt_improve.features.target import profile_for_model, target_guidance
+
+    target = profile_for_model("claude-opus-4-8", "claude")
+    assert "Spanish labels" in target_guidance(target, "rewrite", "Spanish")
+    assert "English labels" in target_guidance(target, "rewrite", "English")
+    # No literal {labels} token must leak into the rendered guidance.
+    assert "{labels}" not in target_guidance(target, "rewrite", "English")
+
+
+def test_package_import_surface_stable():
+    """The refactor preserved the public import path consumed by rules/improve."""
+    from prompt_improve.features.target import (  # noqa: I001
+        GENERIC_TARGET,
+        TargetProfile,
+        profile_for_model,
+        target_guidance,
+        target_profile_from_request,
+    )
+
+    assert GENERIC_TARGET.family == "generic"
+    assert isinstance(TargetProfile, type)
+    assert callable(profile_for_model)
+    assert callable(target_guidance)
+    assert callable(target_profile_from_request)
+
+
 # ---- cache TTL=0 disables caching ------------------------------------------
 
 
