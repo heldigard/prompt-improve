@@ -591,12 +591,12 @@ def test_route_hard_prompt_prefers_cloud():
     orig_local = m.call_ollama_rewrite
     m.needs_cloud_intelligence = lambda _p, _mode: True
 
-    def cloud(_p, _mode, _cwd=None, cloud_model=None):
+    def cloud(_p, _mode, _cwd=None, cloud_model=None, target=None):
         captured["cloud_model"] = cloud_model
         calls["cloud"] += 1
         return ("CLOUD", "cloud:deepseek-v4-flash")
 
-    def local_rw(_p, _cwd=None):
+    def local_rw(_p, _cwd=None, target=None):
         calls["local"] += 1
         return None
 
@@ -625,11 +625,11 @@ def test_route_simple_prompt_prefers_local():
     m.needs_cloud_intelligence = lambda _p, _mode: False
     calls = {"cloud": 0, "local": 0}
 
-    def local_rw(_p, _cwd=None):
+    def local_rw(_p, _cwd=None, target=None):
         calls["local"] += 1
         return ("LOCAL", "ollama:batiai/gemma4-12b:q4")
 
-    def cloud(_p, _mode, _cwd=None, cloud_model=None):
+    def cloud(_p, _mode, _cwd=None, cloud_model=None, target=None):
         calls["cloud"] += 1
         return None
 
@@ -655,10 +655,10 @@ def test_route_local_down_falls_back_to_cloud():
     orig_local = m.call_ollama_rewrite
     m.needs_cloud_intelligence = lambda p, mode: False
 
-    def local_rw(_p, _cwd=None):
+    def local_rw(_p, _cwd=None, target=None):
         return None
 
-    def cloud(_p, _mode, _cwd=None, cloud_model=None):
+    def cloud(_p, _mode, _cwd=None, cloud_model=None, target=None):
         return ("CLOUD-FALLBACK", "cloud:ling-2.6-1t")
 
     m.call_ollama_rewrite = local_rw
@@ -1231,7 +1231,7 @@ def test_main_extracts_cwd_from_stdin():
 
     orig_try = cmd_mod._try_improve
 
-    def spy_try(prompt, mode, c):
+    def spy_try(prompt, mode, c, target=None):
         captured["cwd_received"] = c
         return None, "test", mode
 
@@ -1275,7 +1275,7 @@ def test_try_improve_rewrite_fallback_to_clarify():
     cmd_mod.continuation_context = lambda p, c: None
     call_count = {"n": 0}
 
-    def fake_route(prompt, mode, cwd):
+    def fake_route(prompt, mode, cwd, target=None):
         call_count["n"] += 1
         if mode == "rewrite":
             return None
@@ -1484,7 +1484,7 @@ def test_command_main_falls_through_when_no_model_available():
     import prompt_improve.command as cmd
 
     orig = cmd.route_and_improve
-    cmd.route_and_improve = lambda _p, _mode, _cwd=None: None
+    cmd.route_and_improve = lambda _p, _mode, _cwd=None, target=None: None
     try:
         out = _run_main_via_stdin("asdfgh qwerty", cwd="/nonexistent")
     finally:
@@ -1499,7 +1499,7 @@ def test_command_main_emits_additional_context_on_rewrite():
     hookSpecificOutput.additionalContext (NOT a user-facing question)."""
     import prompt_improve.command as cmd
 
-    def fake_route(_prompt, _mode, _cwd=None):
+    def fake_route(_prompt, _mode, _cwd=None, target=None):
         return ("Tarea: Hacer X.\n\nContexto: y.", "ollama:fake", "rewrite")
 
     orig = cmd.route_and_improve
