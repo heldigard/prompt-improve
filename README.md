@@ -46,7 +46,7 @@ agent/model that will receive it:
   `<task>`, `<context>`, `<constraints>`, and `<acceptance>`.
 - **Codex / OpenAI GPT 5.5 / GPT 5.6**: clean Markdown sections with explicit workflow,
   tool-use, verification, and backticked code identifiers.
-- **Antigravity / Gemini 3.5 Flash / Gemini 3.1 Pro**: component blocks such
+- **Antigravity / Gemini 3.5 Flash / Gemini 3.5 Pro**: component blocks such
   as Objective, Instructions, Context, Constraints, and Output format.
 - **Proxy models** (`GLM 5.2 Code`, `Kimi 2.7 Code`, `MiniMax 3`,
   `MiMo 2.5 Pro`, `DeepSeek V4 Pro`, `DeepSeek V4 Flash`, `Qwen`): direct

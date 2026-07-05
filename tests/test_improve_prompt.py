@@ -1343,7 +1343,7 @@ def test_target_profile_classifies_primary_cli_models():
     assert profile_for_model("gpt-5.5", "codex").family == "openai-gpt"
     assert profile_for_model("gpt-5.6", "codex").version == "5.6"
     assert profile_for_model("Gemini 3.5 Flash (High)", "antigravity").family == "gemini"
-    assert profile_for_model("Gemini 3.1 Pro (High)", "antigravity").family == "gemini"
+    assert profile_for_model("Gemini 3.5 Pro (High)", "antigravity").family == "gemini"
 
 
 def test_target_profile_classifies_proxy_shell_models():
