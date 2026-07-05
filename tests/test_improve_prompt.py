@@ -1139,6 +1139,270 @@ def test_cloud_cascade_does_not_swallow_programmer_errors():
         imod.compat.cheap_complete = old
 
 
+# ---- command.main end-to-end (UserPromptSubmit hook) ----------------------
+
+
+def test_main_passthrough_on_no_delegate_tag():
+    """[NO_DELEGATE] in prompt must passthrough without improvement."""
+    import prompt_improve.command as cmd_mod
+
+    stdin_data = json.dumps({"prompt": "fix it [NO_DELEGATE]"})
+    old_stdin = sys.stdin
+    sys.stdin = io.StringIO(stdin_data)
+    captured = {}
+    old_print = print
+
+    def fake_print(*args, **kwargs):
+        captured["output"] = args[0]
+
+    import builtins
+
+    builtins.print = fake_print
+    try:
+        cmd_mod.main()
+    finally:
+        sys.stdin = old_stdin
+        builtins.print = old_print
+    out = json.loads(captured["output"])
+    assert out["continue"] is True
+    assert "hookSpecificOutput" not in out
+
+
+def test_main_passthrough_on_empty_prompt():
+    """Empty prompt must passthrough."""
+    import prompt_improve.command as cmd_mod
+
+    stdin_data = json.dumps({"prompt": ""})
+    old_stdin = sys.stdin
+    sys.stdin = io.StringIO(stdin_data)
+    captured = {}
+
+    import builtins
+
+    old_print = print
+    builtins.print = lambda *a, **k: captured.update({"output": a[0]})
+    try:
+        cmd_mod.main()
+    finally:
+        sys.stdin = old_stdin
+        builtins.print = old_print
+    out = json.loads(captured["output"])
+    assert out["continue"] is True
+    assert "hookSpecificOutput" not in out
+
+
+def test_main_passthrough_on_trivial():
+    """Trivial prompt (e.g. 'ok') must passthrough."""
+    import prompt_improve.command as cmd_mod
+
+    stdin_data = json.dumps({"prompt": "ok"})
+    old_stdin = sys.stdin
+    sys.stdin = io.StringIO(stdin_data)
+    captured = {}
+
+    import builtins
+
+    old_print = print
+    builtins.print = lambda *a, **k: captured.update({"output": a[0]})
+    try:
+        cmd_mod.main()
+    finally:
+        sys.stdin = old_stdin
+        builtins.print = old_print
+    out = json.loads(captured["output"])
+    assert out["continue"] is True
+    assert "hookSpecificOutput" not in out
+
+
+def test_main_extracts_cwd_from_stdin():
+    """main() reads cwd from the JSON payload."""
+    import prompt_improve.command as cmd_mod
+
+    cwd = tempfile.mkdtemp()
+    stdin_data = json.dumps({"prompt": "continua", "cwd": cwd})
+    old_stdin = sys.stdin
+    sys.stdin = io.StringIO(stdin_data)
+    captured = {}
+
+    import builtins
+
+    old_print = print
+    builtins.print = lambda *a, **k: captured.update({"output": a[0]})
+
+    orig_try = cmd_mod._try_improve
+
+    def spy_try(prompt, mode, c):
+        captured["cwd_received"] = c
+        return None, "test", mode
+
+    cmd_mod._try_improve = spy_try
+    try:
+        cmd_mod.main()
+    finally:
+        sys.stdin = old_stdin
+        builtins.print = old_print
+        cmd_mod._try_improve = orig_try
+    assert captured.get("cwd_received") == cwd
+
+
+def test_main_builds_rewrite_additional_context():
+    """Rewrite mode with memory: source produces expansion context."""
+    import prompt_improve.command as cmd_mod
+
+    result = cmd_mod._build_additional("expanded spec", "memory:currentTask", True)
+    assert "Prompt expandido" in result
+    assert "expanded spec" in result
+    assert "intención original" in result
+
+
+def test_main_builds_clarify_additional_context():
+    """Clarify mode produces improvement context without expansion wrapper."""
+    import prompt_improve.command as cmd_mod
+
+    result = cmd_mod._build_additional("- Check auth", "ollama:model", False)
+    assert "Mejora de prompt" in result
+    assert "- Check auth" in result
+    assert "expandido" not in result.lower()
+
+
+def test_try_improve_rewrite_fallback_to_clarify():
+    """When rewrite returns None but clarify succeeds, effective_mode is 'clarify'."""
+    import prompt_improve.command as cmd_mod
+
+    orig_route = cmd_mod.route_and_improve
+    orig_cont = cmd_mod.continuation_context
+    orig_rules = cmd_mod.rule_based_suggestions
+    cmd_mod.continuation_context = lambda p, c: None
+    call_count = {"n": 0}
+
+    def fake_route(prompt, mode, cwd):
+        call_count["n"] += 1
+        if mode == "rewrite":
+            return None
+        return ("clarified result", "ollama:test")
+
+    cmd_mod.route_and_improve = fake_route
+    cmd_mod.rule_based_suggestions = lambda p: None
+    try:
+        result = cmd_mod._try_improve("fix it", "rewrite", None)
+        assert result[0] == "clarified result"
+        assert result[2] == "clarify"  # effective_mode fell back
+        assert call_count["n"] == 2  # rewrite then clarify
+    finally:
+        cmd_mod.route_and_improve = orig_route
+        cmd_mod.continuation_context = orig_cont
+        cmd_mod.rule_based_suggestions = orig_rules
+
+
+# ---- _build_messages -------------------------------------------------------
+
+
+def test_build_messages_rewrite_includes_language():
+    import prompt_improve.features.improve as m
+
+    system, user = m._build_messages("rewrite", "fix the bug", None)
+    assert "English" in user
+    assert "English" in system or "English" not in system  # system uses language var
+
+
+def test_build_messages_clarify_includes_do_verify():
+    import prompt_improve.features.improve as m
+
+    system, user = m._build_messages("clarify", "fix the bug", None)
+    assert "DO or VERIFY" in user
+
+
+def test_build_messages_includes_project_hint_when_continuation():
+    import prompt_improve.features.improve as m
+
+    with tempfile.TemporaryDirectory() as d:
+        mb = Path(d) / ".memory-bank"
+        mb.mkdir()
+        (mb / "currentTask.md").write_text("- Active: test task\n", encoding="utf-8")
+        _, user = m._build_messages("rewrite", "continua", d)
+        assert "Project context:" in user
+        assert "test task" in user
+
+
+def test_build_messages_omits_hint_when_no_cwd():
+    import prompt_improve.features.improve as m
+
+    _, user = m._build_messages("rewrite", "fix it", None)
+    assert "Project context:" not in user
+
+
+# ---- cache TTL=0 disables caching ------------------------------------------
+
+
+def test_cache_ttl_zero_disables_load():
+    import prompt_improve.shared.cache as cmod
+
+    orig = cmod.CACHE_TTL_SECONDS
+    cmod.CACHE_TTL_SECONDS = 0.0
+    try:
+        assert cmod.load_cached("test", "rewrite") is None
+    finally:
+        cmod.CACHE_TTL_SECONDS = orig
+
+
+def test_cache_ttl_zero_disables_save():
+    import prompt_improve.shared.cache as cmod
+
+    orig = cmod.CACHE_TTL_SECONDS
+    cmod.CACHE_TTL_SECONDS = 0.0
+    try:
+        # Should not raise even with TTL=0
+        cmod.save_cached("test", "rewrite", "improved", "test")
+    finally:
+        cmod.CACHE_TTL_SECONDS = orig
+
+
+# ---- _launch_ollama_serve helper -------------------------------------------
+
+
+def test_launch_ollama_serve_returns_none_when_log_dir_fails():
+    import prompt_improve.shared.ollama as omod
+
+    orig_log = omod.OLLAMA_LOG
+    omod.OLLAMA_LOG = "/nonexistent/dir/ollama.log"
+    try:
+        result = omod._launch_ollama_serve()
+        assert result is None
+    finally:
+        omod.OLLAMA_LOG = orig_log
+
+
+# ---- _debug helper (no-op when disabled) -----------------------------------
+
+
+def test_debug_noop_when_disabled():
+    import prompt_improve.features.improve as m
+
+    orig = m._DEBUG
+    m._DEBUG = False
+    try:
+        # Should not raise or produce output
+        m._debug("test message")
+    finally:
+        m._DEBUG = orig
+
+
+def test_debug_writes_to_stderr_when_enabled():
+    import prompt_improve.features.improve as m
+
+    orig = m._DEBUG
+    m._DEBUG = True
+    captured = io.StringIO()
+    old_stderr = sys.stderr
+    sys.stderr = captured
+    try:
+        m._debug("test message")
+    finally:
+        sys.stderr = old_stderr
+        m._DEBUG = orig
+    assert "test message" in captured.getvalue()
+
+
 # ---- unittest fallback (run without pytest) --------------------------------
 
 

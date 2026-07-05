@@ -160,6 +160,7 @@ def call_cloud_cascade(
 ) -> tuple[str, str] | None:
     """Cloud via cheap_llm cascade (cross-provider failover)."""
     if not CLOUD_FALLBACK or compat.cheap_complete is None:
+        _debug("cloud cascade disabled or cheap_llm unavailable")
         return None
     system, user = _build_messages(mode, prompt, cwd)
     try:
@@ -176,6 +177,7 @@ def call_cloud_cascade(
         # Transient/network/data-shape failures from the cloud cascade — fail OPEN
         # (return None → caller falls back to local). Programmer errors (NameError,
         # AttributeError) intentionally bubble up so they surface in tests.
+        _debug("cloud cascade raised transient error")
         return None
     text = (result.get("text") or "").strip() if isinstance(result, dict) else ""
     if not text:
@@ -190,10 +192,14 @@ def call_cloud_cascade(
 def route_and_improve(prompt: str, mode: str, cwd: str | None) -> tuple[str, str] | None:
     """Intelligent model router: hard → cloud first, else local first; cloud as availability fallback."""
     if needs_cloud_intelligence(prompt, mode):
+        _debug("hard prompt → cloud-first (deepseek-v4-flash)")
         result = call_cloud_cascade(prompt, mode, cwd, cloud_model="deepseek/deepseek-v4-flash")
         if result:
             return result
+        _debug("cloud-first failed, falling back to local")
+    _debug(f"trying local ({mode})")
     result = call_ollama_rewrite(prompt, cwd) if mode == "rewrite" else call_ollama(prompt, cwd)
     if result:
         return result
+    _debug("local unavailable, trying cloud availability fallback")
     return call_cloud_cascade(prompt, mode, cwd)
