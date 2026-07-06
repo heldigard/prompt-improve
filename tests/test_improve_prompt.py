@@ -778,12 +778,29 @@ def test_role_model_map_exists():
 
 
 def test_role_model_map_prefers_gemma4():
-    """gemma4-12b is the first candidate for both prompt roles."""
+    """First candidate is a gemma4-architecture model for both prompt roles.
+
+    Architecture verified via ollama's /api/show `details.family` rather than
+    the model NAME, because gemma4 fine-tunes (e.g. kai-os/Grug-12B, pegasus912,
+    Librellama, mradermacher, etc.) don't always carry 'gemma' in the tag.
+    2026-07-05 round-3: kai-os/Grug-12B-GGUF replaced pegasus912 as improve PRIMARY
+    (won by 2× on hard prompts: 8.39 vs 4.15).
+    """
+    import json
+    import urllib.request
+
     for role in ("prompt_rewrite", "prompt_clarify"):
         candidates = ip._ROLE_MODEL_MAP[role]
         assert len(candidates) >= 2, f"{role} should have at least 2 candidates"
-        assert "gemma" in candidates[0].lower(), (
-            f"{role} should prefer gemma4 first, got {candidates[0]}"
+        primary = candidates[0]
+        with urllib.request.urlopen(
+            "http://localhost:11434/api/show",
+            data=json.dumps({"name": primary}).encode(),
+            timeout=5,
+        ) as r:
+            family = json.load(r).get("details", {}).get("family", "")
+        assert family == "gemma4", (
+            f"{role} should prefer gemma4-arch first, got {primary} (family={family})"
         )
 
 

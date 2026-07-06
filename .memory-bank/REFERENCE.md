@@ -1,10 +1,11 @@
 # REFERENCE - Stable Facts
 
-## Model benchmarks (2026-07-04 re-bench — improve task, Ollama 0.31.1, combined-rank)
-- Primary: **hf.co/pegasus912/gemma-4-12b-it-qat-heretic-ud-q4-k-xl:latest** (improve #1; gemma-4-12B QAT heretic UD Q4_K_XL). Matches `shared/config.py::_DEFAULT_IMPROVE_CHAIN` + `~/ollama-bench/RANKING.md`.
-- #2: **Librellama/gemma4:e2b-Uncensored** (improve #2)
+## Model benchmarks (2026-07-05 re-bench — improve task, Ollama 0.31.1, round-3 update)
+- Primary: **hf.co/kai-os/Grug-12B-GGUF:Q4_K_M** (improve #1; gemma4-12B compact-reasoning fine-tune, won improve by 2× on hard prompts: 8.39 vs 4.15 over pegasus912). Matches `shared/config.py::_DEFAULT_IMPROVE_CHAIN` + `~/ollama-bench/RANKING.md`. See `~/ollama-bench/.memory-bank/topics/candidates-round-3-2026-07-05.md`.
+- #2: **hf.co/pegasus912/gemma-4-12b-it-qat-heretic-ud-q4-k-xl:latest** (improve #2; demoted 2026-07-05; same gemma4-12B family, kept as fallback for diversity)
+- #3: **Librellama/gemma4:e2b-Uncensored** (improve #3 + codeq_sum #1)
 - Anchor fallback: **qwen3.5:4b** (universal — last in chain, always works)
-- Chain in code: `pegasus912 → Librellama/gemma4:e2b → qwen3.5:4b` (all installed). Full available-model tail appended at runtime by `choose_ollama_model_for_role`; missing models degrade gracefully.
+- Chain in code: `Grug-12B → pegasus912 → Librellama/gemma4:e2b → qwen3.5:4b` (all installed). Full available-model tail appended at runtime by `choose_ollama_model_for_role`; missing models degrade gracefully.
 - Superseded: `Huihui-gemma-4-12B-abliterated` (was primary in the OLD `~/bench/ollama/` bench; ranked outside top-5 in the 2026-07-04 re-bench and REMOVED from the host lineup — no longer a safe default). `MobiusDevelopment/gemma-4-12B-it-qat` (uninstalled, was codeq default — also superseded).
 - Bench source of truth: **`~/ollama-bench/RANKING.md`** (the vertical-slice successor to the old `~/bench/ollama/`).
 
