@@ -909,6 +909,24 @@ def test_choose_model_for_role_env_override():
         omod.start_ollama_best_effort = orig_start
 
 
+def test_choose_model_for_role_fuzzy_match():
+    """Fuzzy/normalized matching handles prefix registry URLs and varying tags."""
+    import prompt_improve.shared.ollama as omod
+
+    orig_models = omod.available_ollama_models
+    # Local Ollama has 'Grug-12B-GGUF:latest' but default chain is 'hf.co/kai-os/Grug-12B-GGUF:Q4_K_M'
+    omod.available_ollama_models = lambda: ["Grug-12B-GGUF:latest", "qwen3.5:4b"]
+    orig_start = omod.start_ollama_best_effort
+    omod.start_ollama_best_effort = lambda: True
+    try:
+        primary, fallbacks = omod.choose_ollama_model_for_role("prompt_rewrite")
+        assert primary == "Grug-12B-GGUF:latest"
+    finally:
+        omod.available_ollama_models = orig_models
+        omod.start_ollama_best_effort = orig_start
+
+
+
 # ---- clean module: direct unit tests ----------------------------------------
 
 

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import subprocess
 import time
 from urllib.error import HTTPError, URLError
@@ -90,6 +91,18 @@ def start_ollama_best_effort() -> bool:
     return False
 
 
+
+
+
+def _normalize_model_name(name: str) -> str:
+    # remove registry prefixes/usernames (e.g. hf.co/kai-os/Grug-12B-GGUF -> Grug-12B-GGUF)
+    name = re.sub(r'^(?:[^/]+/){1,2}', '', name)
+    # remove tags
+    if ':' in name:
+        name = name.split(':')[0]
+    return name.lower().replace('-', '').replace('_', '').replace('.', '')
+
+
 def choose_ollama_model_for_role(role: str) -> tuple[str | None, list[str]]:
     """Pick the best available model for a specific task role.
 
@@ -105,19 +118,34 @@ def choose_ollama_model_for_role(role: str) -> tuple[str | None, list[str]]:
     if not available:
         return None, []
 
+    # Map normalized names to actual available names for fallback matching
+    norm_available: dict[str, str] = {}
+    for actual in available:
+        norm = _normalize_model_name(actual)
+        if norm:
+            norm_available[norm] = actual
+
+    def find_match(cand: str) -> str | None:
+        if cand in available:
+            return cand
+        cand_norm = _normalize_model_name(cand)
+        return norm_available.get(cand_norm)
+
     role_candidates = _ROLE_MODEL_MAP.get(role, [])
     all_ordered: list[str] = []
     seen: set[str] = set()
 
     for model in role_candidates:
-        if model in available and model not in seen:
-            all_ordered.append(model)
-            seen.add(model)
+        match = find_match(model)
+        if match and match not in seen:
+            all_ordered.append(match)
+            seen.add(match)
 
     for model in OLLAMA_MODEL_CANDIDATES:
-        if model in available and model not in seen:
-            all_ordered.append(model)
-            seen.add(model)
+        match = find_match(model)
+        if match and match not in seen:
+            all_ordered.append(match)
+            seen.add(match)
 
     for model in available:
         if model not in seen:
@@ -127,3 +155,4 @@ def choose_ollama_model_for_role(role: str) -> tuple[str | None, list[str]]:
     if not all_ordered:
         return None, []
     return all_ordered[0], all_ordered[1:]
+

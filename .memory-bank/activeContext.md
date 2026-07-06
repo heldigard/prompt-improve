@@ -1,5 +1,8 @@
 # Active Context
 
+## 2026-07-06
+- Shipped fuzzy model name matching fallback helper in `ollama.py` to match local Ollama models regardless of prefix registry URLs/usernames or tag variations. Added unit tests to `test_improve_prompt.py`. Gates: 109/109 tests passed, ruff clean.
+
 ## 2026-07-05
 - SHIPPED (commit 6a53b96, origin/main): behavior-aware vertical-slice refactor of `features/target`. `target.py` (287L) → `target/{profile,shape,__init__}.py`. Two dimensions per family (format + behavior-mitigation). Fixed 6-family collapse bug. 110 tests pass, ruff+mypy clean. Full decision detail: `systemPatterns.md`.
 - NEXT: optional Plan-agent validation still pending in background (non-blocking — design self-supporting). Refresh behavior hints when `model-specific.md` updates.
