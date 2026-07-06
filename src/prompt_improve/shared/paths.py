@@ -199,13 +199,75 @@ def project_hint(cwd: str | None) -> str:
     return "; ".join(parts)
 
 
+_TOPIC_INDEX_LINE_RE = re.compile(r"^\s*-\s+\[([^\]]+)\]\(([0-9a-zA-Z_\-]+)\.md\)")
+# Words ignored when scoring prompt↔topic overlap (too generic to anchor on).
+_TOPIC_STOPWORDS = frozenset(
+    "the a an of for to in on at with and or topic topics index tbd project "
+    "memory bank deep context session agent".split()
+)
+
+
+def _tokenize_for_topic(prompt: str) -> set[str]:
+    """Content tokens (len>=3, lowercased, punctuation-stripped) minus stopwords."""
+    return {
+        w.lower().strip(".,;:()[]\"'`") for w in prompt.split() if len(w) >= 3
+    } - _TOPIC_STOPWORDS
+
+
+def _topic_hint(prompt: str, root: Path, max_scan: int = 40) -> str:
+    """One-line topic pointer from ``topics/_index.md`` via keyword overlap.
+
+    Deterministic + fail-open: no LLM, no embeddings — reads the nearest index,
+    scores prompt tokens against each topic's title + description, returns the
+    best slug when there is real overlap. Returns ``""`` otherwise so the
+    improver gets no spurious anchor. Synergy bridge between prompt-improve and
+    agent-memory's deep ``topics/`` layer (the controller reads the slug on
+    demand if the overlap is relevant).
+    """
+    idx = root / ".memory-bank" / "topics" / "_index.md"
+    try:
+        lines = idx.read_text(encoding="utf-8", errors="ignore").splitlines()[:max_scan]
+    except OSError:
+        return ""
+    prompt_tokens = _tokenize_for_topic(prompt)
+    if not prompt_tokens:
+        return ""
+    best_slug = ""
+    best_title = ""
+    best_score = 0
+    for line in lines:
+        match = _TOPIC_INDEX_LINE_RE.match(line)
+        if not match:
+            continue
+        title, slug = match.group(1), match.group(2)
+        desc = line[match.end() :].lstrip(" \t—-")
+        hay = f"{title} {desc}".lower()
+        score = sum(1 for tok in prompt_tokens if tok in hay)
+        if score > best_score:
+            best_score = score
+            best_slug = slug
+            best_title = title
+    if best_score == 0 or not best_slug:
+        return ""
+    return f"topic={best_slug} ({best_title})"
+
+
 def project_hint_for_prompt(prompt: str, cwd: str | None) -> str:
-    """Project anchor used by the LLM prompt improver."""
+    """Project anchor used by the LLM prompt improver (cwd + currentTask + topic)."""
     if not cwd:
         return ""
-    if should_include_task_hint(prompt):
-        return project_hint(cwd)
     try:
-        return f"cwd={Path(cwd).name or cwd}"
-    except Exception:
+        root = Path(cwd).expanduser().resolve()
+    except (OSError, ValueError):
+        root = None
+    if should_include_task_hint(prompt):
+        base = project_hint(cwd)
+    elif root is not None:
+        base = f"cwd={Path(cwd).name or cwd}"
+    else:
         return ""
+    if root is not None:
+        hint = _topic_hint(prompt, root)
+        if hint:
+            base = f"{base}; {hint}"
+    return base

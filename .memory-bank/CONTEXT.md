@@ -1,5 +1,5 @@
 # CONTEXT - Current State
-> Updated: 2026-07-05
+> Updated: 2026-07-06
 
 ## What it does
 `prompt-improve` is a UserPromptSubmit hook that improves vague prompts before the agent sees them:
@@ -9,8 +9,12 @@
 - **Deterministic continuation**: bare "continua" → memory-based expansion (no LLM)
 - **Target-aware shaping**: detects the receiving CLI/model family and shapes the
   improved prompt in two dimensions — **format** + **behavior** (failure-mode mitigation)
+- **Topic-hint bridge**: `project_hint_for_prompt` also surfaces a deep-topic pointer
+  (`topic=<slug>`) from the nearest `.memory-bank/topics/_index.md` via deterministic
+  keyword overlap — no LLM, no embeddings, fail-open. Synergy with agent-memory.
 
 ## Recent Changes
+- 2026-07-06: Added topic-hint bridge in `shared/paths.py` (`_topic_hint`); `project_hint_for_prompt` now emits `cwd=…; topic=<slug> (title)` when a topic overlaps the prompt. +6 tests (test_topic_hint.py). 108 total pass.
 - 2026-07-05: Refactored `features/target.py` → `features/target/` package (`profile.py` + `shape.py` + `__init__.py`); added behavior dimension; fixed 6-family collapse bug. 110 tests pass.
 - 2026-07-04: Graduated from `~/.claude/hooks/prompt-improve.py` (1244L monolith) to `~/prompt-improve/` package
 - 2026-07-04: Added role-based model routing (gemma4-12b primary, qwen3.5:4b fallback)
