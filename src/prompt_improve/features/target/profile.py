@@ -113,6 +113,18 @@ def profile_for_model(model: str, cli: str | None = None) -> TargetProfile:
         return TargetProfile(clean_cli, clean_model, "claude", _version(lower), "xml-tags")
     if clean_cli in {"agy", "antigravity", "gemini"}:
         return TargetProfile(clean_cli, clean_model, "gemini", _version(lower), "component-blocks")
+    if clean_cli in {"qwen", "qwenc"}:
+        return TargetProfile(clean_cli, clean_model, "qwen", _version(lower), "literal-markdown")
+    if clean_cli in {"dseek", "deepseek"}:
+        return TargetProfile(clean_cli, clean_model, "deepseek", _version(lower), "explicit-steps")
+    if clean_cli in {"mini", "minimax", "codex-minimax"}:
+        return TargetProfile(clean_cli, clean_model, "minimax", _version(lower), "agentic-markdown")
+    if clean_cli in {"kimi", "kimic"}:
+        return TargetProfile(clean_cli, clean_model, "kimi", _version(lower), "agentic-markdown")
+    if clean_cli in {"mimo"}:
+        return TargetProfile(clean_cli, clean_model, "mimo", _version(lower), "explicit-steps")
+    if clean_cli in {"zai", "glm"}:
+        return TargetProfile(clean_cli, clean_model, "glm", _version(lower), "explicit-steps")
     return TargetProfile(clean_cli, clean_model, "generic", _version(lower), "plain-markdown")
 
 

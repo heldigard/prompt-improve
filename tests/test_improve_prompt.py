@@ -1421,6 +1421,17 @@ def test_target_profile_explicit_model_beats_codex_cli_fallback():
     assert profile_for_model("deepseek-v4-flash", "codex").family == "deepseek"
 
 
+def test_target_profile_classifies_proxy_cli_without_model():
+    from prompt_improve.features.target import profile_for_model
+
+    assert profile_for_model("unknown", "mini").family == "minimax"
+    assert profile_for_model("unknown", "kimi").family == "kimi"
+    assert profile_for_model("unknown", "dseek").family == "deepseek"
+    assert profile_for_model("unknown", "qwen").family == "qwen"
+    assert profile_for_model("unknown", "zai").family == "glm"
+    assert profile_for_model("unknown", "mimo").family == "mimo"
+
+
 def test_target_profile_reads_common_model_envs():
     from prompt_improve.features.target import target_profile_from_request
 
@@ -1428,7 +1439,18 @@ def test_target_profile_reads_common_model_envs():
         "PROMPT_IMPROVE_TARGET_MODEL",
         "CODEX_MODEL",
         "OPENAI_MODEL",
+        "OPENAI_API_MODEL",
+        "CLAUDE_MODEL",
+        "ANTHROPIC_MODEL",
+        "GEMINI_MODEL",
+        "GOOGLE_MODEL",
+        "AGY_MODEL",
+        "DEEPSEEK_MODEL",
+        "QWEN_MODEL",
+        "KIMI_MODEL",
         "MINIMAX_MODEL",
+        "ZAI_MODEL",
+        "GLM_MODEL",
         "MODEL_NAME",
         "MODEL_ID",
         "MODEL",
