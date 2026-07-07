@@ -1187,7 +1187,7 @@ def test_main_passthrough_on_no_delegate_tag():
     captured = {}
     old_print = print
 
-    def fake_print(*args, **kwargs):
+    def fake_print(*args, **_kwargs):
         captured["output"] = args[0]
 
     import builtins
@@ -1345,6 +1345,24 @@ def test_build_messages_clarify_includes_do_verify():
 
     system, user = m._build_messages("clarify", "fix the bug", None)
     assert "DO or VERIFY" in user
+
+
+def test_build_messages_use_codex_real_tooling_not_lsp():
+    import prompt_improve.features.improve as m
+
+    system, _ = m._build_messages("rewrite", "refactor this function safely", None)
+    assert "codeq" in system
+    assert "codescan" in system
+    assert "LSP" not in system
+
+
+def test_ollama_url_is_loopback_only():
+    from prompt_improve.shared.ollama_url import normalize_ollama_url
+
+    assert normalize_ollama_url("http://127.0.0.1:11434") == "http://127.0.0.1:11434"
+    assert normalize_ollama_url("http://localhost:11434") == "http://localhost:11434"
+    assert normalize_ollama_url("https://127.0.0.1:11434") == "http://127.0.0.1:11434"
+    assert normalize_ollama_url("http://example.com:11434") == "http://127.0.0.1:11434"
 
 
 def test_build_messages_includes_project_hint_when_continuation():

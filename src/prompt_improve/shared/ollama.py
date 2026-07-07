@@ -22,7 +22,8 @@ from prompt_improve.shared.config import (
 
 def _get_json(path: str, timeout: float) -> dict | None:
     try:
-        with urlopen(f"{OLLAMA_URL.rstrip('/')}{path}", timeout=timeout) as response:
+        # OLLAMA_URL is normalized to http loopback in shared.config.
+        with urlopen(f"{OLLAMA_URL.rstrip('/')}{path}", timeout=timeout) as response:  # nosemgrep: python.lang.security.audit.dynamic-urllib-use-detected.dynamic-urllib-use-detected
             return json.loads(response.read().decode("utf-8"))
     except (HTTPError, URLError, TimeoutError, OSError, ValueError, json.JSONDecodeError):
         return None
@@ -155,4 +156,3 @@ def choose_ollama_model_for_role(role: str) -> tuple[str | None, list[str]]:
     if not all_ordered:
         return None, []
     return all_ordered[0], all_ordered[1:]
-

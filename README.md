@@ -14,6 +14,9 @@ prompts into structured specs and clarifies long prompts with actionable bullets
 - **Cloud escalation**: complex prompts (security, architecture, migration) routed to DeepSeek V4 Flash
 - **Language-aware**: detects Spanish/English, preserves user language
 - **Project-grounded**: reads `.memory-bank/currentTask.md` for context
+- **Ecosystem-aware tooling hints**: avoids nonexistent LSP assumptions in
+  Codex paths and nudges agents toward `codeq` for code facts and `codescan`
+  for quality sensors
 - **Deterministic continuation**: bare "continua" prompts get memory-based expansion (no LLM)
 - **Cached**: 5-minute TTL cache per project scope and target model profile
 

@@ -7,13 +7,16 @@ import re
 from pathlib import Path
 
 from prompt_improve.shared import compat
+from prompt_improve.shared.ollama_url import normalize_ollama_url
 
 # ---------------------------------------------------------------------------
 # Ollama config
 # ---------------------------------------------------------------------------
-OLLAMA_URL = os.environ.get(
-    "OLLAMA_URL",
-    getattr(compat.ollama_client, "DEFAULT_URL", "http://127.0.0.1:11434"),
+OLLAMA_URL = normalize_ollama_url(
+    os.environ.get(
+        "OLLAMA_URL",
+        getattr(compat.ollama_client, "DEFAULT_URL", "http://127.0.0.1:11434"),
+    )
 )
 OLLAMA_TIMEOUT = float(os.environ.get("OLLAMA_IMPROVE_TIMEOUT", "45.0"))
 OLLAMA_AUTOSTART = os.environ.get("OLLAMA_IMPROVE_AUTOSTART", "1") != "0"
