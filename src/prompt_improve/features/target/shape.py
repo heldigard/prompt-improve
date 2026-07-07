@@ -49,6 +49,9 @@ def target_guidance(target: TargetProfile, mode: str, language: str) -> str:
     shape = SHAPES.get(target.family, SHAPES["generic"])
     template = shape.rewrite if mode == "rewrite" else shape.clarify
     guidance = _render(template, language)
+    variant = _variant_guidance(target)
+    if variant:
+        guidance = f"{guidance} {variant}"
     if shape.behavior:
         guidance = f"{guidance} {shape.behavior}"
     return guidance
@@ -62,6 +65,60 @@ def _render(template: str, language: str) -> str:
     """
     labels = "Spanish labels" if language == "Spanish" else "English labels"
     return template.replace("{labels}", labels)
+
+
+def _variant_guidance(target: TargetProfile) -> str:
+    """Small current-model notes layered over broad family guidance."""
+    lower = target.model.lower()
+    if target.family == "openai-gpt":
+        notes = []
+        if "gpt-5.5" in lower or target.style == "gpt5-outcome-first":
+            notes.append(
+                "Version note: GPT-5.5 responds best to outcome-first prompts: "
+                "goal, constraints, success criteria, allowed side effects, "
+                "evidence rules, and output shape; avoid prescribing every "
+                "intermediate step unless the path matters."
+            )
+        if target.cli == "codex" or "codex" in lower:
+            notes.append(
+                "Codex note: include relevant files/context when known, plan first "
+                "for difficult work, describe tools crisply, parallelize independent "
+                "reads, and verify with the smallest useful check."
+            )
+        return " ".join(notes)
+    if target.family == "claude" and any(token in lower for token in ("opus", "fable", "sonnet")):
+        return (
+            "Version note: use consistent, descriptive XML tags and keep examples, "
+            "context, inputs, and instructions in separate tagged regions."
+        )
+    if target.family == "gemini" and ("gemini 3" in lower or "gemini-3" in lower):
+        return (
+            "Version note: Gemini 3 responds best to concise, direct instructions; "
+            "for long context, place the data/context first and anchor the final "
+            "request after it with an explicit output format."
+        )
+    if target.family == "deepseek" and "v4" in lower:
+        return (
+            "Version note: DeepSeek V4 is strong for coding and agentic reasoning; "
+            "keep externally visible steps numbered, specify the final answer "
+            "contract, and do not request hidden chain-of-thought."
+        )
+    if target.family == "qwen" and ("qwen3" in lower or "qwen-3" in lower):
+        return (
+            "Version note: Qwen3 prompts should be self-contained and literal; "
+            "avoid relying on follow-up dialogue to fill missing task constraints."
+        )
+    if target.family == "minimax" and ("m3" in lower or target.style == "minimax-m3-longctx"):
+        return (
+            "Version note: MiniMax M3 supports long agentic/coding context, but the "
+            "prompt should still name the first artifact and a stop condition."
+        )
+    if target.family == "kimi" and ("2.7" in lower or "k2.7" in lower):
+        return (
+            "Version note: Kimi K2.7 Code is code-focused with thinking behavior "
+            "already on; keep coding tasks self-contained and acceptance-driven."
+        )
+    return ""
 
 
 # ---- registry --------------------------------------------------------------
@@ -92,8 +149,8 @@ SHAPES: dict[str, FamilyShape] = {
         family="openai-gpt",
         rewrite=(
             "Target model profile: OpenAI GPT/Codex. Output clean Markdown sections "
-            "with explicit role/workflow guidance, concrete tool-use or verification "
-            "steps when inferable, and backticks around file paths/functions/classes. "
+            "with an outcome-first contract, concrete tool-use or verification "
+            "rules when inferable, and backticks around file paths/functions/classes. "
             "Separate instructions from the user's original input; do not use XML."
         ),
         clarify=(
@@ -102,9 +159,9 @@ SHAPES: dict[str, FamilyShape] = {
             "backticks for paths/functions/classes. Do not use XML."
         ),
         behavior=(
-            "Mitigation: structure the spec as FILES / SIGNATURE / STEPS / EDGE "
-            "CASES / ACCEPTANCE — GPT/Codex yields measurably better output from an "
-            "explicit deterministic spec than from open prose."
+            "Mitigation: structure the spec around FILES / CONTRACT / CONSTRAINTS / "
+            "EVIDENCE / ACCEPTANCE — GPT/Codex follows explicit success criteria "
+            "and stopping rules better than open prose."
         ),
     ),
     "gemini": FamilyShape(
@@ -149,16 +206,16 @@ SHAPES: dict[str, FamilyShape] = {
         family="deepseek",
         rewrite=(
             "Target model profile: DeepSeek. Use numbered deterministic steps; "
-            "DeepSeek is a reasoning model and yields better output when sub-steps "
-            "are explicit and chain-of-thought is not over-constrained."
+            "DeepSeek is a reasoning model and yields better output when visible "
+            "sub-steps and final-answer contracts are explicit."
         ),
         clarify=(
-            "Target model profile: DeepSeek. Number the steps; let the model reason between them."
+            "Target model profile: DeepSeek. Number the visible steps and define the final answer."
         ),
         behavior=(
             "Mitigation: DeepSeek is a reasoning model — give it numbered "
-            "deterministic steps and leave room for chain-of-thought; do not "
-            "over-constrain intermediate output."
+            "deterministic steps, but do not request hidden chain-of-thought or "
+            "over-constrain intermediate reasoning output."
         ),
     ),
     "glm": FamilyShape(

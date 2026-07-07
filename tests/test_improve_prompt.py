@@ -1394,8 +1394,11 @@ def test_target_profile_classifies_primary_cli_models():
     assert profile_for_model("claude-sonnet-5", "claude").style == "xml-tags"
     assert profile_for_model("claude-fable-5", "claude").family == "claude"
     assert profile_for_model("gpt-5.5", "codex").family == "openai-gpt"
+    assert profile_for_model("gpt-5.5", "codex").style == "gpt5-outcome-first"
     assert profile_for_model("gpt-5.6", "codex").version == "5.6"
+    assert profile_for_model("gpt-5.4-mini", "codex").family == "openai-gpt"
     assert profile_for_model("Gemini 3.5 Flash (High)", "antigravity").family == "gemini"
+    assert profile_for_model("Gemini 3.5 Flash (High)", "antigravity").style == "gemini3-concise-blocks"
     assert profile_for_model("Gemini 3.5 Pro (High)", "antigravity").family == "gemini"
 
 
@@ -1408,6 +1411,42 @@ def test_target_profile_classifies_proxy_shell_models():
     assert profile_for_model("deepseek-v4-pro[1m]", "dseek").family == "deepseek"
     assert profile_for_model("glm-5.2[1m]", "zai").family == "glm"
     assert profile_for_model("qwen3.7-max[1m]", "qwen").family == "qwen"
+
+
+def test_target_profile_explicit_model_beats_codex_cli_fallback():
+    from prompt_improve.features.target import profile_for_model
+
+    assert profile_for_model("MiniMax-M3[1m]", "codex").family == "minimax"
+    assert profile_for_model("kimi-k2.7-code", "codex").family == "kimi"
+    assert profile_for_model("deepseek-v4-flash", "codex").family == "deepseek"
+
+
+def test_target_profile_reads_common_model_envs():
+    from prompt_improve.features.target import target_profile_from_request
+
+    keys = (
+        "PROMPT_IMPROVE_TARGET_MODEL",
+        "CODEX_MODEL",
+        "OPENAI_MODEL",
+        "MINIMAX_MODEL",
+        "MODEL_NAME",
+        "MODEL_ID",
+        "MODEL",
+    )
+    saved = {key: os.environ.get(key) for key in keys}
+    try:
+        for key in keys:
+            os.environ.pop(key, None)
+        os.environ["MINIMAX_MODEL"] = "MiniMax-M3[1m]"
+        target = target_profile_from_request({})
+        assert target.family == "minimax"
+        assert target.style == "minimax-m3-longctx"
+    finally:
+        for key, value in saved.items():
+            if value is None:
+                os.environ.pop(key, None)
+            else:
+                os.environ[key] = value
 
 
 def test_build_messages_uses_claude_xml_guidance():
@@ -1429,6 +1468,9 @@ def test_build_messages_uses_codex_markdown_guidance():
     system, _ = m._build_messages("rewrite", "fix the bug", None, target)
     assert "OpenAI GPT/Codex" in system
     assert "Markdown sections" in system
+    assert "outcome-first prompts" in system
+    assert "allowed side effects" in system
+    assert "smallest useful check" in system
     assert "do not use XML" in system
 
 
@@ -1441,6 +1483,7 @@ def test_build_messages_uses_gemini_component_guidance():
     assert "Gemini/Antigravity" in system
     assert "Objective" in system
     assert "Output format" in system
+    assert "concise, direct instructions" in system
 
 
 def test_cache_mode_is_target_specific():
@@ -1523,6 +1566,13 @@ def test_clarify_mode_also_includes_behavior():
     target = profile_for_model("qwen3.7-max[1m]", "qwen")
     clarify = target_guidance(target, "clarify", "English")
     assert "failed command" in clarify
+
+
+def test_deepseek_guidance_does_not_request_hidden_cot():
+    from prompt_improve.features.target import profile_for_model, target_guidance
+
+    guidance = target_guidance(profile_for_model("deepseek-v4-flash", "dseek"), "rewrite", "English")
+    assert "do not request hidden chain-of-thought" in guidance
 
 
 def test_language_label_substituted_in_claude_rewrite():

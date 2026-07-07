@@ -54,17 +54,19 @@ def target_profile_from_request(data: dict | None = None) -> TargetProfile:
     data = data or {}
     cli = _first_text(
         os.environ.get("PROMPT_IMPROVE_TARGET_CLI"),
+        os.environ.get("CODEX_TARGET_CLI"),
+        os.environ.get("CLAUDE_TARGET_CLI"),
         data.get("cli"),
         data.get("client"),
         data.get("tool"),
+        data.get("app"),
     )
     model = _first_text(
         os.environ.get("PROMPT_IMPROVE_TARGET_MODEL"),
         _model_from_payload(data),
+        _model_from_env(),
         os.environ.get("ANTHROPIC_MODEL"),
         _model_from_agent_identity(os.environ.get("CLAUDE_AGENT_IDENTITY")),
-        os.environ.get("CODEX_MODEL"),
-        os.environ.get("AGY_MODEL"),
     )
 
     if not cli:
@@ -86,27 +88,31 @@ def profile_for_model(model: str, cli: str | None = None) -> TargetProfile:
     clean_cli = (cli or _cli_from_env_or_model(clean_model) or "generic").lower()
 
     if _looks_like_claude(lower):
-        return TargetProfile(clean_cli, clean_model, "claude", _version(lower), "xml-tags")
-    if _looks_like_openai(lower) or clean_cli == "codex":
-        return TargetProfile(
-            clean_cli, clean_model, "openai-gpt", _version(lower), "codex-markdown"
-        )
-    if _looks_like_gemini(lower) or clean_cli in {"agy", "antigravity", "gemini"}:
-        return TargetProfile(clean_cli, clean_model, "gemini", _version(lower), "component-blocks")
+        return TargetProfile(clean_cli, clean_model, "claude", _version(lower), _claude_style(lower))
+    if _looks_like_gemini(lower):
+        return TargetProfile(clean_cli, clean_model, "gemini", _version(lower), _gemini_style(lower))
     if _looks_like_qwen(lower):
-        return TargetProfile(clean_cli, clean_model, "qwen", _version(lower), "literal-markdown")
+        return TargetProfile(clean_cli, clean_model, "qwen", _version(lower), _qwen_style(lower))
     if _looks_like_deepseek(lower):
-        return TargetProfile(clean_cli, clean_model, "deepseek", _version(lower), "explicit-steps")
+        return TargetProfile(clean_cli, clean_model, "deepseek", _version(lower), _deepseek_style(lower))
     if _looks_like_minimax(lower):
-        return TargetProfile(clean_cli, clean_model, "minimax", _version(lower), "agentic-markdown")
+        return TargetProfile(clean_cli, clean_model, "minimax", _version(lower), _minimax_style(lower))
     if _looks_like_kimi(lower):
-        return TargetProfile(clean_cli, clean_model, "kimi", _version(lower), "agentic-markdown")
+        return TargetProfile(clean_cli, clean_model, "kimi", _version(lower), _kimi_style(lower))
     if _looks_like_mimo(lower):
         return TargetProfile(clean_cli, clean_model, "mimo", _version(lower), "explicit-steps")
     if _looks_like_glm(lower):
         return TargetProfile(clean_cli, clean_model, "glm", _version(lower), "explicit-steps")
     if _looks_like_gemma(lower):
         return TargetProfile(clean_cli, clean_model, "gemma", _version(lower), "compact-markdown")
+    if _looks_like_openai(lower) or clean_cli == "codex":
+        return TargetProfile(
+            clean_cli, clean_model, "openai-gpt", _version(lower), _openai_style(lower)
+        )
+    if clean_cli == "claude":
+        return TargetProfile(clean_cli, clean_model, "claude", _version(lower), "xml-tags")
+    if clean_cli in {"agy", "antigravity", "gemini"}:
+        return TargetProfile(clean_cli, clean_model, "gemini", _version(lower), "component-blocks")
     return TargetProfile(clean_cli, clean_model, "generic", _version(lower), "plain-markdown")
 
 
@@ -118,8 +124,45 @@ def _model_from_payload(data: dict) -> str | None:
     if isinstance(model, str):
         return model
     if isinstance(model, dict):
-        return _first_text(model.get("id"), model.get("name"), model.get("display_name"))
-    return _first_text(data.get("model_id"), data.get("model_name"))
+        return _first_text(
+            model.get("id"),
+            model.get("name"),
+            model.get("display_name"),
+            model.get("slug"),
+        )
+    return _first_text(
+        data.get("model_id"),
+        data.get("model_name"),
+        data.get("active_model"),
+        data.get("selected_model"),
+        data.get("modelName"),
+    )
+
+
+def _model_from_env() -> str | None:
+    """Best-effort active-model lookup across CLI wrappers.
+
+    Values are model IDs, not secrets. API-key env vars are intentionally not read.
+    """
+    return _first_text(
+        os.environ.get("CODEX_MODEL"),
+        os.environ.get("OPENAI_MODEL"),
+        os.environ.get("OPENAI_API_MODEL"),
+        os.environ.get("CLAUDE_MODEL"),
+        os.environ.get("ANTHROPIC_MODEL"),
+        os.environ.get("GEMINI_MODEL"),
+        os.environ.get("GOOGLE_MODEL"),
+        os.environ.get("AGY_MODEL"),
+        os.environ.get("DEEPSEEK_MODEL"),
+        os.environ.get("QWEN_MODEL"),
+        os.environ.get("KIMI_MODEL"),
+        os.environ.get("MINIMAX_MODEL"),
+        os.environ.get("ZAI_MODEL"),
+        os.environ.get("GLM_MODEL"),
+        os.environ.get("MODEL_NAME"),
+        os.environ.get("MODEL_ID"),
+        os.environ.get("MODEL"),
+    )
 
 
 def _model_from_agent_identity(identity: str | None) -> str | None:
@@ -142,12 +185,22 @@ def _cli_from_env_or_model(model: str | None) -> str | None:
     if os.environ.get("AGY_SETTINGS"):
         return "antigravity"
     lower = (model or "").lower()
-    if _looks_like_openai(lower):
-        return "codex"
-    if _looks_like_gemini(lower):
-        return "antigravity"
     if _looks_like_claude(lower):
         return "claude"
+    if _looks_like_gemini(lower):
+        return "antigravity"
+    if _looks_like_openai(lower):
+        return "codex"
+    if _looks_like_minimax(lower):
+        return "mini"
+    if _looks_like_kimi(lower):
+        return "kimi"
+    if _looks_like_deepseek(lower):
+        return "dseek"
+    if _looks_like_qwen(lower):
+        return "qwen"
+    if _looks_like_glm(lower):
+        return "zai"
     return None
 
 
@@ -195,7 +248,7 @@ def _looks_like_deepseek(text: str) -> bool:
 
 
 def _looks_like_minimax(text: str) -> bool:
-    return "minimax" in text or "mini" in text
+    return "minimax" in text or "mini-max" in text or bool(re.search(r"\bminimax-m?\d", text))
 
 
 def _looks_like_kimi(text: str) -> bool:
@@ -215,6 +268,52 @@ def _looks_like_gemma(text: str) -> bool:
 
 
 # ---- helpers ---------------------------------------------------------------
+
+
+def _claude_style(text: str) -> str:
+    if "opus" in text or "fable" in text or "mythos" in text:
+        return "xml-tags-longctx"
+    return "xml-tags"
+
+
+def _openai_style(text: str) -> str:
+    if "codex" in text:
+        return "codex-outcome-first"
+    if re.search(r"\bgpt-5(?:\.5|\b|-)", text):
+        return "gpt5-outcome-first"
+    return "codex-markdown"
+
+
+def _gemini_style(text: str) -> str:
+    if re.search(r"\bgemini[- ]?3", text):
+        return "gemini3-concise-blocks"
+    return "component-blocks"
+
+
+def _qwen_style(text: str) -> str:
+    if "coder" in text or "code" in text:
+        return "qwen-coder-literal"
+    if re.search(r"\bqwen3\b|\bqwen3[.-]", text):
+        return "qwen3-literal"
+    return "literal-markdown"
+
+
+def _deepseek_style(text: str) -> str:
+    if "v4" in text:
+        return "deepseek-v4-reasoning"
+    return "explicit-steps"
+
+
+def _minimax_style(text: str) -> str:
+    if re.search(r"\bm3\b|m3", text):
+        return "minimax-m3-longctx"
+    return "agentic-markdown"
+
+
+def _kimi_style(text: str) -> str:
+    if "2.7" in text or "k2.7" in text:
+        return "kimi-k2.7-code"
+    return "agentic-markdown"
 
 
 def _version(text: str) -> str:
