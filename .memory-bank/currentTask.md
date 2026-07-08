@@ -1,16 +1,11 @@
 # Current Task
-> Updated: 2026-07-05
+> Updated: 2026-07-08
 
 ## Goal
-- Maintain target-aware prompt improvement for Claude Code, Codex, and Antigravity/Gemini — now behavior-aware (per-family failure-mode mitigation, not just format).
+- None.
 
-## Status — done
-- [x] Target profile detection (`features/target/profile.py`)
-- [x] Behavior dimension: `FamilyShape` registry with format + behavior per family (`features/target/shape.py`)
-- [x] Fixed 6-family collapse: qwen/deepseek/glm/minimax/kimi/mimo now emit DISTINCT guidance
-- [x] Regression tests cover all 11 families + behavior keywords + import surface + language-label substitution
-- [x] README documents both dimensions (format table + behavior column) and the `target/` architecture
-- [x] Vertical-slice refactor shipped (commit 6a53b96): `target.py` → `target/{profile,shape,__init__}.py`
+## Status
+- No active implementation guide. Completed work is in progress.md.
 
 ## Status — carried over (stable)
 - [x] Shell wrappers `ec53`/`ec54` export `PROMPT_IMPROVE_TARGET_*` explicitly before calling `enhance`

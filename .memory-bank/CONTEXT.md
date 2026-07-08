@@ -11,7 +11,8 @@
   improved prompt in two dimensions — **format** + **behavior** (failure-mode mitigation)
 - **Topic-hint bridge**: `project_hint_for_prompt` also surfaces a deep-topic pointer
   (`topic=<slug>`) from the nearest `.memory-bank/topics/_index.md` via deterministic
-  keyword overlap — no LLM, no embeddings, fail-open. Synergy with agent-memory.
+  keyword overlap — no LLM, no embeddings, fail-open. Operational session topics
+  are skipped to avoid stale worker-log context.
 
 ## Recent Changes
 - 2026-07-06: Added topic-hint bridge in `shared/paths.py` (`_topic_hint`); `project_hint_for_prompt` now emits `cwd=…; topic=<slug> (title)` when a topic overlaps the prompt. +6 tests (test_topic_hint.py). 108 total pass.

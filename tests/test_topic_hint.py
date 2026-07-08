@@ -59,11 +59,24 @@ def test_project_hint_appends_topic_on_overlap(tmp_path: Path) -> None:
     bank.mkdir()
     _write_index(
         bank,
-        "## Topics\n- [Foreign Sessions](foreign-sessions.md) — cross-CLI registry\n",
+        "## Topics\n- [Quote Engine](quote-engine.md) — pricing workflow\n",
+    )
+    hint = project_hint_for_prompt("how does the pricing workflow quote", str(tmp_path))
+    assert "cwd=" in hint
+    assert "topic=quote-engine" in hint
+
+
+def test_project_hint_omits_operational_session_topics(tmp_path: Path) -> None:
+    bank = tmp_path / ".memory-bank"
+    bank.mkdir()
+    _write_index(
+        bank,
+        "## Topics\n"
+        "- [Foreign Sessions](foreign-sessions.md) — cross-CLI registry\n"
+        "- [Agent Sessions](agent-sessions.md) — old worker activity\n",
     )
     hint = project_hint_for_prompt("how do foreign sessions register", str(tmp_path))
-    assert "cwd=" in hint
-    assert "topic=foreign-sessions" in hint
+    assert hint == f"cwd={tmp_path.name}"
 
 
 def test_project_hint_omits_topic_without_overlap(tmp_path: Path) -> None:

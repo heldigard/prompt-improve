@@ -205,6 +205,13 @@ _TOPIC_STOPWORDS = frozenset(
     "the a an of for to in on at with and or topic topics index tbd project "
     "memory bank deep context session agent".split()
 )
+_OPERATIONAL_TOPIC_SLUGS = frozenset(
+    {
+        "agent-sessions",
+        "foreign-sessions",
+        "session-handoffs",
+    }
+)
 
 
 def _tokenize_for_topic(prompt: str) -> set[str]:
@@ -240,6 +247,8 @@ def _topic_hint(prompt: str, root: Path, max_scan: int = 40) -> str:
         if not match:
             continue
         title, slug = match.group(1), match.group(2)
+        if slug in _OPERATIONAL_TOPIC_SLUGS:
+            continue
         desc = line[match.end() :].lstrip(" \t—-")
         hay = f"{title} {desc}".lower()
         score = sum(1 for tok in prompt_tokens if tok in hay)
