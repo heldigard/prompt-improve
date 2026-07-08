@@ -68,20 +68,56 @@ def main() -> None:
     cwd: str | None = None
     data: dict | None = None
     direct_cli = False
-    try:
-        loaded = json.load(sys.stdin)
-        data = loaded if isinstance(loaded, dict) else None
-        if isinstance(data, dict):
-            prompt = data.get("prompt", "").strip()
-            cwd = data.get("cwd") or data.get("cwd_path")
-        else:
-            prompt = ""
-    except (json.JSONDecodeError, OSError):
-        if len(sys.argv) > 1:
-            prompt = " ".join(sys.argv[1:]).strip()
-            direct_cli = True
-        else:
-            prompt = sys.stdin.read().strip()
+    prompt = ""
+
+    # Check command-line arguments for options first to avoid blocking on stdin read when TTY is active
+    if len(sys.argv) > 1:
+        first_arg = sys.argv[1].strip()
+        if first_arg in ("--version", "-v"):
+            from prompt_improve import __version__
+
+            print(f"prompt-improve version {__version__}")
+            return
+        if first_arg in ("--help", "-h"):
+            print("prompt-improve — LLM-powered prompt improvement hook")
+            print()
+            print("Usage:")
+            print("  python3 -m prompt_improve.command [prompt]")
+            print("  Or pass a JSON payload containing 'prompt' and optionally 'cwd' via stdin.")
+            print()
+            print("Options:")
+            print("  -v, --version  Show version")
+            print("  -h, --help     Show this help message")
+            return
+
+    # Determine input source: stdin (JSON or plain) vs arguments
+    # If stdin is not a TTY (piped/redirected), try reading from it first
+    # If stdin is a TTY, only read from it if we have no command-line arguments.
+    use_stdin = not sys.stdin.isatty() or len(sys.argv) == 1
+
+    content_read = False
+    if use_stdin:
+        try:
+            content = sys.stdin.read().strip()
+            if content:
+                content_read = True
+                try:
+                    loaded = json.loads(content)
+                    data = loaded if isinstance(loaded, dict) else None
+                    if isinstance(data, dict):
+                        prompt = data.get("prompt", "").strip()
+                        cwd = data.get("cwd") or data.get("cwd_path")
+                    else:
+                        prompt = content
+                except json.JSONDecodeError:
+                    prompt = content
+        except OSError:
+            pass
+
+    if not content_read and len(sys.argv) > 1:
+        prompt = " ".join(sys.argv[1:]).strip()
+        direct_cli = True
+
     target = target_profile_from_request(data)
 
     if (
