@@ -27,6 +27,8 @@ for _candidate in (_CLAUDE_ROOT / "scripts",):
 
 try:
     import ollama_client  # type: ignore[import-not-found]
+
+    ollama_client.require("1.0")  # SemVer gate — fail fast on version drift
 except Exception:  # pragma: no cover - env-dependent
     ollama_client = None  # type: ignore[assignment]
 
