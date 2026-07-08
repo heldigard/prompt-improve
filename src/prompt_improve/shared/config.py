@@ -30,7 +30,7 @@ OLLAMA_PID = os.path.expanduser("~/.ollama/ollama-serve.pid")
 # Default chain = 2026-07-08 PM re-bench winners. OmniCoder is improve #1 (held;
 # also bug_finding #1) -> Negentropy-claude-opus-4.7-9B (improve #2 combined) ->
 # SetneufPT/Qwopus3.5-4B-Coder-MTP (tool_call/pdf_extract/structured #1) ->
-# qwen3.5:4b as the small universal fallback. The full available-model tail is
+# cryptidbleh/gemma4-claude-opus-4.6 as the small universal fallback. The full available-model tail is
 # appended at runtime by choose_ollama_model_for_role, so this is prioritization,
 # not a hard dependency.
 _DEFAULT_IMPROVE_CHAIN = (
