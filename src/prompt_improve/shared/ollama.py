@@ -101,6 +101,10 @@ def _normalize_model_name(name: str) -> str:
     # remove tags
     if ':' in name:
         name = name.split(':')[0]
+    # remove host/quantization hints that vary by local install tag
+    name = re.sub(r'_Q\d+K_\d+GB-GPU$', '', name, flags=re.I)
+    name = re.sub(r'_Q\d+_\d+k_\d+GB-GPU$', '', name, flags=re.I)
+    name = re.sub(r'_(?:UD_)?Q\d(?:_[A-Z0-9]+)*$', '', name, flags=re.I)
     return name.lower().replace('-', '').replace('_', '').replace('.', '')
 
 

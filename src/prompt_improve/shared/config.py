@@ -27,18 +27,16 @@ OLLAMA_PID = os.path.expanduser("~/.ollama/ollama-serve.pid")
 # ---------------------------------------------------------------------------
 # Model candidates (global fallback)
 # ---------------------------------------------------------------------------
-# Default chain = re-bench improve winners 2026-07-05 (Ollama 0.31.1, validated
-# through tie-break hard prompts + reproduce). Ordered by combined rank:
-# Grug-12B (improve #1, gemma4-12B compact-reasoning, won improve by 2× vs pegasus912
-# on hard prompts: 8.39 vs 4.15) → pegasus912 (improve #2, gemma4-12B QAT heretic) →
-# Librellama/gemma4:e2b (improve #3 + codeq_sum #1) → qwen3.5:4b (universal anchor).
-# The full available-model tail is appended at runtime by choose_ollama_model_for_role,
-# so this is prioritization, not a hard dependency — missing models degrade
-# gracefully. See ~/ollama-bench/.memory-bank/topics/candidates-round-3-2026-07-05.md.
+# Default chain = 2026-07-08 canonical refactor re-bench winners. Ordered by
+# task score: SetneufPT/Qwopus3.5-4B-Coder-MTP (improve #1) -> OmniCoder
+# (improve #2 + code_gen #1) -> functiongemma (improve #3, structured-output
+# specialist) -> qwen3.5:4b as the small universal fallback. The full
+# available-model tail is appended at runtime by choose_ollama_model_for_role,
+# so this is prioritization, not a hard dependency.
 _DEFAULT_IMPROVE_CHAIN = (
-    "hf.co/kai-os/Grug-12B-GGUF:Q4_K_M,"
-    "hf.co/pegasus912/gemma-4-12b-it-qat-heretic-ud-q4-k-xl:latest,"
-    "Librellama/gemma4:e2b-Uncensored,"
+    "SetneufPT/Qwopus3.5-4B-Coder-MTP_Q4_64k_8GB-GPU:latest,"
+    "zfujicute/OmniCoder-Qwen3.5-9B-Claude-4.6-Opus-Uncensored-v2-GGUF:latest,"
+    "hf.co/slyfox1186/qwen3.5-9b-opus-4.6-functiongemma.gguf:Q4_K_M,"
     "qwen3.5:4b"
 )
 

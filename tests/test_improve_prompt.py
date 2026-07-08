@@ -777,14 +777,11 @@ def test_role_model_map_exists():
     assert "prompt_clarify" in ip._ROLE_MODEL_MAP
 
 
-def test_role_model_map_prefers_gemma4():
-    """First candidate is a gemma4-architecture model for both prompt roles.
+def test_role_model_map_prefers_refactor_winner():
+    """First candidate is the 2026-07-08 improve winner for both prompt roles.
 
     Architecture verified via ollama's /api/show `details.family` rather than
-    the model NAME, because gemma4 fine-tunes (e.g. kai-os/Grug-12B, pegasus912,
-    Librellama, mradermacher, etc.) don't always carry 'gemma' in the tag.
-    2026-07-05 round-3: kai-os/Grug-12B-GGUF replaced pegasus912 as improve PRIMARY
-    (won by 2× on hard prompts: 8.39 vs 4.15).
+    the model NAME, because registry tags can vary.
     """
     import json
     import urllib.request
@@ -797,10 +794,10 @@ def test_role_model_map_prefers_gemma4():
             "http://localhost:11434/api/show",
             data=json.dumps({"name": primary}).encode(),
             timeout=5,
-        ) as r:
-            family = json.load(r).get("details", {}).get("family", "")
-        assert family == "gemma4", (
-            f"{role} should prefer gemma4-arch first, got {primary} (family={family})"
+            ) as r:
+                family = json.load(r).get("details", {}).get("family", "")
+        assert family == "qwen35", (
+            f"{role} should prefer qwen35-arch first, got {primary} (family={family})"
         )
 
 
@@ -851,15 +848,15 @@ def test_choose_model_for_role_prefers_role_candidate():
     orig = omod.available_ollama_models
     omod.available_ollama_models = lambda: [
         "qwen3.5:4b",
-        "Librellama/gemma4:e2b-Uncensored",
+        "zfujicute/OmniCoder-Qwen3.5-9B-Claude-4.6-Opus-Uncensored-v2-GGUF:latest",
     ]
     orig_start = omod.start_ollama_best_effort
     omod.start_ollama_best_effort = lambda: True
     try:
         primary, fallbacks = omod.choose_ollama_model_for_role("prompt_rewrite")
         assert primary is not None
-        # Librellama/gemma4:e2b-Uncensored is ahead of qwen3.5:4b in the role chain → must win
-        assert "gemma" in primary.lower()
+        # OmniCoder is ahead of qwen3.5:4b in the role chain -> must win.
+        assert "omnicoder" in primary.lower()
         assert len(fallbacks) >= 1
     finally:
         omod.available_ollama_models = orig
@@ -867,7 +864,7 @@ def test_choose_model_for_role_prefers_role_candidate():
 
 
 def test_choose_model_for_role_falls_back_when_primary_unavailable():
-    """When gemma4 is unavailable, qwen3.5:4b is chosen."""
+    """When ranked improve models are unavailable, qwen3.5:4b is chosen."""
     import prompt_improve.shared.ollama as omod
 
     orig = omod.available_ollama_models
@@ -914,13 +911,14 @@ def test_choose_model_for_role_fuzzy_match():
     import prompt_improve.shared.ollama as omod
 
     orig_models = omod.available_ollama_models
-    # Local Ollama has 'Grug-12B-GGUF:latest' but default chain is 'hf.co/kai-os/Grug-12B-GGUF:Q4_K_M'
-    omod.available_ollama_models = lambda: ["Grug-12B-GGUF:latest", "qwen3.5:4b"]
+    # Local Ollama has the bare family suffix but the default chain includes
+    # the full SetneufPT registry tag and quantization hint.
+    omod.available_ollama_models = lambda: ["Qwopus3.5-4B-Coder-MTP:latest", "qwen3.5:4b"]
     orig_start = omod.start_ollama_best_effort
     omod.start_ollama_best_effort = lambda: True
     try:
         primary, fallbacks = omod.choose_ollama_model_for_role("prompt_rewrite")
-        assert primary == "Grug-12B-GGUF:latest"
+        assert primary == "Qwopus3.5-4B-Coder-MTP:latest"
     finally:
         omod.available_ollama_models = orig_models
         omod.start_ollama_best_effort = orig_start

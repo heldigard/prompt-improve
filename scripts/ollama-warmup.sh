@@ -9,7 +9,7 @@ command -v ollama >/dev/null 2>&1 || exit 0
 LOG_DIR="$HOME/.ollama/logs"
 LOG_FILE="$LOG_DIR/ollama-serve.log"
 PID_FILE="$HOME/.ollama/ollama-serve.pid"
-MODEL="${OLLAMA_IMPROVE_WARM_MODEL:-hf.co/kai-os/Grug-12B-GGUF:Q4_K_M}" # 2026-07-05 re-bench (Ollama 0.31.1): improve PRIMARY (round-3, won improve by 2× on hard prompts: 8.39 vs pegasus912 4.15). gemma4-12B compact-reasoning, 7.4 GB.
+MODEL="${OLLAMA_IMPROVE_WARM_MODEL:-SetneufPT/Qwopus3.5-4B-Coder-MTP_Q4_64k_8GB-GPU:latest}" # 2026-07-08 canonical refactor: improve PRIMARY.
 
 mkdir -p "$LOG_DIR"
 

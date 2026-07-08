@@ -1,2 +1,4 @@
 {"id": "g_002", "s": "agy3-pro", "p": "DELEGATED_TO", "o": "Gemini 3.5 Pro slot with Gemini 3.5 Flash fallback", "t": "2026-07-05", "src": "systemPatterns.md", "supersedes": [], "aliases": ["Antigravity long-context", "agy-research"]}
 {"id": "g_003", "s": "TargetProfile", "p": "DECIDED", "o": "ExplicitModelOverCliFallback", "t": "2026-07-07", "src": "systemPatterns.md", "supersedes": [], "aliases": []}
+{"id": "g_004", "s": "prompt-improve", "p": "consumes-ranking-from", "o": "ollama-bench", "t": "2026-07-07", "src": "progress.md", "supersedes": [], "aliases": []}
+{"id": "g_005", "s": "prompt-improve", "p": "DEPENDS_ON", "o": "ollama-bench", "t": "2026-07-07", "src": "progress.md", "supersedes": [], "aliases": []}

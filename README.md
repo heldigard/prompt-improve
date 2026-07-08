@@ -5,7 +5,7 @@ prompts into structured specs and clarifies long prompts with actionable bullets
 
 ## Features
 
-- **Role-based model routing**: gemma4-12b for quality, qwen3.5:4b as fallback
+- **Role-based model routing**: SetneufPT/Qwopus3.5 for improve quality, OmniCoder/functiongemma as fallbacks, qwen3.5:4b as compatibility tail
 - **Target-aware prompt shaping**: detects the receiving CLI/model family and
   shapes the improved prompt in two dimensions — **format** (XML vs Markdown vs
   component blocks) and **behavior** (per-family failure-mode mitigations, e.g.
