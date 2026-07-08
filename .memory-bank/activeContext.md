@@ -1,5 +1,10 @@
 # Active Context
 
+## 2026-07-08
+- SHIPPED: `command.main()` input-source rewrite — `--version`/`-v` + `--help`/`-h` CLI flags short-circuit before stdin read; `use_stdin` + `content_read` logic so direct argv mode no longer blocks on a real TTY and empty piped stdin falls through to argv. Hook-runtime JSON path unchanged. (Picked up + finished work a sibling model left mid-edit.)
+- SHIPPED: test suite split — monolithic `tests/test_improve_prompt.py` (1881L, 111 tests) → 9 focused files mirroring `features/*` (`test_detect`, `test_clean`, `test_hints`, `test_classify`, `test_improve`, `test_target`, `test_cache`, `test_command`, `test_infra`). Helpers colocated, no conftest. 118 tests pass (111 split + 7 in `test_topic_hint`).
+- Gates: 118/118 pytest, ruff check + format clean, py_compile OK. Tree committed + pushed to `origin/main`.
+
 ## 2026-07-06
 - Shipped fuzzy model name matching fallback helper in `ollama.py` to match local Ollama models regardless of prefix registry URLs/usernames or tag variations. Added unit tests to `test_improve_prompt.py`. Gates: 109/109 tests passed, ruff clean.
 
