@@ -37,7 +37,7 @@ _DEFAULT_IMPROVE_CHAIN = (
     "zfujicute/OmniCoder-Qwen3.5-9B-Claude-4.6-Opus-Uncensored-v2-GGUF:latest,"
     "hf.co/Jackrong/Negentropy-claude-opus-4.7-9B-GGUF:Q4_K_M,"
     "SetneufPT/Qwopus3.5-4B-Coder-MTP_Q4_64k_8GB-GPU:latest,"
-    "qwen3.5:4b"
+    "cryptidbleh/gemma4-claude-opus-4.6:latest"
 )
 
 OLLAMA_MODEL_CANDIDATES = [
