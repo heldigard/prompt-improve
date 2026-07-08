@@ -794,8 +794,8 @@ def test_role_model_map_prefers_refactor_winner():
             "http://localhost:11434/api/show",
             data=json.dumps({"name": primary}).encode(),
             timeout=5,
-            ) as r:
-                family = json.load(r).get("details", {}).get("family", "")
+        ) as r:
+            family = json.load(r).get("details", {}).get("family", "")
         assert family == "qwen35", (
             f"{role} should prefer qwen35-arch first, got {primary} (family={family})"
         )
@@ -912,17 +912,19 @@ def test_choose_model_for_role_fuzzy_match():
 
     orig_models = omod.available_ollama_models
     # Local Ollama has the bare family suffix but the default chain includes
-    # the full SetneufPT registry tag and quantization hint.
-    omod.available_ollama_models = lambda: ["Qwopus3.5-4B-Coder-MTP:latest", "qwen3.5:4b"]
+    # the full OmniCoder registry tag and quantization hint.
+    omod.available_ollama_models = lambda: [
+        "OmniCoder-Qwen3.5-9B-Claude-4.6-Opus-Uncensored-v2-GGUF:latest",
+        "qwen3.5:4b",
+    ]
     orig_start = omod.start_ollama_best_effort
     omod.start_ollama_best_effort = lambda: True
     try:
         primary, fallbacks = omod.choose_ollama_model_for_role("prompt_rewrite")
-        assert primary == "Qwopus3.5-4B-Coder-MTP:latest"
+        assert primary == "OmniCoder-Qwen3.5-9B-Claude-4.6-Opus-Uncensored-v2-GGUF:latest"
     finally:
         omod.available_ollama_models = orig_models
         omod.start_ollama_best_effort = orig_start
-
 
 
 # ---- clean module: direct unit tests ----------------------------------------
@@ -1396,7 +1398,10 @@ def test_target_profile_classifies_primary_cli_models():
     assert profile_for_model("gpt-5.6", "codex").version == "5.6"
     assert profile_for_model("gpt-5.4-mini", "codex").family == "openai-gpt"
     assert profile_for_model("Gemini 3.5 Flash (High)", "antigravity").family == "gemini"
-    assert profile_for_model("Gemini 3.5 Flash (High)", "antigravity").style == "gemini3-concise-blocks"
+    assert (
+        profile_for_model("Gemini 3.5 Flash (High)", "antigravity").style
+        == "gemini3-concise-blocks"
+    )
     assert profile_for_model("Gemini 3.5 Pro (High)", "antigravity").family == "gemini"
 
 
@@ -1591,7 +1596,9 @@ def test_clarify_mode_also_includes_behavior():
 def test_deepseek_guidance_does_not_request_hidden_cot():
     from prompt_improve.features.target import profile_for_model, target_guidance
 
-    guidance = target_guidance(profile_for_model("deepseek-v4-flash", "dseek"), "rewrite", "English")
+    guidance = target_guidance(
+        profile_for_model("deepseek-v4-flash", "dseek"), "rewrite", "English"
+    )
     assert "do not request hidden chain-of-thought" in guidance
 
 

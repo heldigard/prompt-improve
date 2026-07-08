@@ -34,8 +34,8 @@ OLLAMA_PID = os.path.expanduser("~/.ollama/ollama-serve.pid")
 # available-model tail is appended at runtime by choose_ollama_model_for_role,
 # so this is prioritization, not a hard dependency.
 _DEFAULT_IMPROVE_CHAIN = (
-    "SetneufPT/Qwopus3.5-4B-Coder-MTP_Q4_64k_8GB-GPU:latest,"
     "zfujicute/OmniCoder-Qwen3.5-9B-Claude-4.6-Opus-Uncensored-v2-GGUF:latest,"
+    "hf.co/ykarout/Qwen3.5-9b-Opus-Openclaw-Distilled-GGUF:Q4_K_M,"
     "hf.co/slyfox1186/qwen3.5-9b-opus-4.6-functiongemma.gguf:Q4_K_M,"
     "qwen3.5:4b"
 )
