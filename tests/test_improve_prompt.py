@@ -864,16 +864,16 @@ def test_choose_model_for_role_prefers_role_candidate():
 
 
 def test_choose_model_for_role_falls_back_when_primary_unavailable():
-    """When ranked improve models are unavailable, qwen3.5:4b is chosen."""
+    """When ranked improve models are unavailable, cryptidbleh/gemma4-claude-opus-4.6:latest is chosen."""
     import prompt_improve.shared.ollama as omod
 
     orig = omod.available_ollama_models
-    omod.available_ollama_models = lambda: ["qwen3.5:4b", "some-other-model"]
+    omod.available_ollama_models = lambda: ["cryptidbleh/gemma4-claude-opus-4.6:latest", "some-other-model"]
     orig_start = omod.start_ollama_best_effort
     omod.start_ollama_best_effort = lambda: True
     try:
         primary, fallbacks = omod.choose_ollama_model_for_role("prompt_rewrite")
-        assert primary == "qwen3.5:4b"
+        assert primary == "cryptidbleh/gemma4-claude-opus-4.6:latest"
     finally:
         omod.available_ollama_models = orig
         omod.start_ollama_best_effort = orig_start
