@@ -74,10 +74,16 @@ def _variant_guidance(target: TargetProfile) -> str:
         notes = []
         if "gpt-5.5" in lower or target.style == "gpt5-outcome-first":
             notes.append(
-                "Version note: GPT-5.5 responds best to outcome-first prompts: "
+                "Version note: GPT-5.x responds best to outcome-first prompts: "
                 "goal, constraints, success criteria, allowed side effects, "
                 "evidence rules, and output shape; avoid prescribing every "
                 "intermediate step unless the path matters."
+            )
+        if target.version.startswith("5.6"):
+            notes.append(
+                "GPT-5.6 note: prioritize required facts, evidence, decisions, and next actions "
+                "over generic brevity. Keep the prompt and tool guidance lightweight; add detail "
+                "only for a task-specific requirement."
             )
         if target.cli == "codex" or "codex" in lower:
             notes.append(

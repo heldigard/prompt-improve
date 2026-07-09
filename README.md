@@ -5,7 +5,7 @@ prompts into structured specs and clarifies long prompts with actionable bullets
 
 ## Features
 
-- **Role-based model routing**: SetneufPT/Qwopus3.5 for improve quality, OmniCoder/functiongemma as fallbacks, qwen3.5:4b as compatibility tail
+- **Role-based model routing**: `OmniCoder-Qwen3.5-9B` (improve #1) → `Negentropy-claude-opus-4.7-9B` (improve #2) → `SetneufPT/Qwopus3.5-4B-Coder-MTP` (tool_call/structured #1) → `cryptidbleh/gemma4-claude-opus-4.6` (small universal fallback). Override the whole chain via `OLLAMA_IMPROVE_MODELS`; per-role via `OLLAMA_IMPROVE_ROLE_PROMPT_REWRITE` / `OLLAMA_IMPROVE_ROLE_PROMPT_CLARIFY`
 - **Target-aware prompt shaping**: detects the receiving CLI/model family and
   shapes the improved prompt in two dimensions — **format** (XML vs Markdown vs
   component blocks) and **behavior** (per-family failure-mode mitigations, e.g.
@@ -49,7 +49,7 @@ The local Ollama model improves the prompt, but the output is optimized for the
 agent/model that will receive it. Each family gets **three layers** of guidance:
 
 - **Format** — how to structure the improved prompt.
-- **Variant** — small notes for current model lines such as GPT-5.5, Gemini 3,
+- **Variant** — small notes for current model lines such as GPT-5.6, Gemini 3,
   DeepSeek V4, MiniMax M3, or Kimi K2.7 Code.
 - **Behavior** — a mitigation for the family's known failure-mode, sourced from
   `~/.claude/rules/model-specific.md`. Empty for `generic`.
@@ -75,7 +75,13 @@ guidance instead of GPT guidance. Common env inputs include
 `CLAUDE_AGENT_IDENTITY`, `CODEX_MODEL`, `OPENAI_MODEL`, `GEMINI_MODEL`,
 `DEEPSEEK_MODEL`, `QWEN_MODEL`, `KIMI_MODEL`, `MINIMAX_MODEL`, and `MODEL_NAME`.
 For Codex wrappers, setting `PROMPT_IMPROVE_TARGET_CLI=codex` and
-`PROMPT_IMPROVE_TARGET_MODEL=gpt-5.5` gives deterministic routing.
+`PROMPT_IMPROVE_TARGET_MODEL=gpt-5.6-terra` gives deterministic routing.
+Native Claude Code hooks are recognized from their `transcript_path` payload
+field even when active-model metadata is absent. `CLAUDECODE` / `CLAUDE_CODE_*`
+remain wrapper fallbacks.
+The local fallback chain shares a 24-second wall-clock budget by default
+(`OLLAMA_IMPROVE_TOTAL_TIMEOUT`) so a cold or rejected model cannot multiply
+interactive hook latency across every fallback.
 
 ### Architecture (`features/target/`)
 

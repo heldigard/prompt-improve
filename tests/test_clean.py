@@ -63,6 +63,7 @@ def test_clean_rewrite_strips_english_validation_questions():
 def test_clean_rewrite_softens_absolute_in_output():
     raw = "Add tests.\n\nAcceptance criteria: 100% coverage of all logic."
     cleaned = ip._clean_rewrite(raw, "add tests")
+    assert cleaned is not None
     assert "100% coverage" not in cleaned
 
 

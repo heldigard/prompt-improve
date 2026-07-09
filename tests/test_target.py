@@ -92,6 +92,80 @@ def test_target_profile_reads_common_model_envs():
                 os.environ[key] = value
 
 
+def test_target_profile_detects_claude_code_without_model_metadata():
+    """Claude Code's UserPromptSubmit payload does not include the active model.
+
+    The hook process does expose harness markers, so those must still select
+    Claude shaping instead of silently falling back to generic Markdown.
+    """
+    from prompt_improve.features.target import target_profile_from_request
+
+    keys = (
+        "CLAUDECODE",
+        "CLAUDE_CODE_ENTRYPOINT",
+        "PROMPT_IMPROVE_TARGET_CLI",
+        "PROMPT_IMPROVE_TARGET_MODEL",
+        "ANTHROPIC_MODEL",
+        "ANTHROPIC_BASE_URL",
+        "CODEX_WORKER",
+    )
+    saved = {key: os.environ.get(key) for key in keys}
+    codex_vars = {key: value for key, value in os.environ.items() if key.startswith("CODEX_")}
+    try:
+        for key in keys:
+            os.environ.pop(key, None)
+        for key in codex_vars:
+            os.environ.pop(key, None)
+
+        os.environ["CLAUDECODE"] = "1"
+        target = target_profile_from_request({"hook_event_name": "UserPromptSubmit"})
+        assert target.cli == "claude"
+        assert target.family == "claude"
+        assert target.style == "xml-tags"
+
+        os.environ.pop("CLAUDECODE")
+        os.environ["CLAUDE_CODE_ENTRYPOINT"] = "cli"
+        target = target_profile_from_request({"hook_event_name": "UserPromptSubmit"})
+        assert target.cli == "claude"
+        assert target.family == "claude"
+    finally:
+        for key in set(keys) | set(codex_vars):
+            value = saved.get(key, codex_vars.get(key))
+            if value is None:
+                os.environ.pop(key, None)
+            else:
+                os.environ[key] = value
+
+
+def test_target_profile_detects_claude_from_native_hook_payload():
+    from prompt_improve.features.target import target_profile_from_request
+
+    payload = {
+        "hook_event_name": "UserPromptSubmit",
+        "prompt": "improve error handling",
+        "cwd": "/tmp/project",
+        "transcript_path": "/tmp/transcript.jsonl",
+        "permission_mode": "plan",
+    }
+    target = target_profile_from_request(payload)
+    assert target.cli == "claude"
+    assert target.family == "claude"
+    assert target.style == "xml-tags"
+
+
+def test_permission_mode_alone_does_not_claim_non_claude_payload():
+    from prompt_improve.features.target import target_profile_from_request
+
+    target = target_profile_from_request(
+        {
+            "hook_event_name": "UserPromptSubmit",
+            "permission_mode": "plan",
+            "prompt": "improve error handling",
+        }
+    )
+    assert target.cli != "claude"
+
+
 def test_build_messages_uses_claude_xml_guidance():
     import prompt_improve.features.improve as m
     from prompt_improve.features.target import profile_for_model
@@ -112,9 +186,21 @@ def test_build_messages_uses_codex_markdown_guidance():
     assert "OpenAI GPT/Codex" in system
     assert "Markdown sections" in system
     assert "outcome-first prompts" in system
+    assert "GPT-5.x" in system
     assert "allowed side effects" in system
     assert "smallest useful check" in system
     assert "do not use XML" in system
+
+
+def test_gpt56_variants_use_prioritization_not_generic_brevity():
+    import prompt_improve.features.improve as m
+    from prompt_improve.features.target import profile_for_model
+
+    for model in ("gpt-5.6-sol", "gpt-5.6-terra", "gpt-5.6-luna"):
+        target = profile_for_model(model, "codex")
+        system, _ = m._build_messages("rewrite", "fix the bug", None, target)
+        assert "prioritize required facts" in system
+        assert "over generic brevity" in system
 
 
 def test_build_messages_uses_gemini_component_guidance():

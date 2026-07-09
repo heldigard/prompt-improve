@@ -61,6 +61,8 @@ def target_profile_from_request(data: dict | None = None) -> TargetProfile:
         data.get("tool"),
         data.get("app"),
     )
+    if not cli:
+        cli = _cli_from_payload(data)
     model = _first_text(
         os.environ.get("PROMPT_IMPROVE_TARGET_MODEL"),
         _model_from_payload(data),
@@ -88,15 +90,23 @@ def profile_for_model(model: str, cli: str | None = None) -> TargetProfile:
     clean_cli = (cli or _cli_from_env_or_model(clean_model) or "generic").lower()
 
     if _looks_like_claude(lower):
-        return TargetProfile(clean_cli, clean_model, "claude", _version(lower), _claude_style(lower))
+        return TargetProfile(
+            clean_cli, clean_model, "claude", _version(lower), _claude_style(lower)
+        )
     if _looks_like_gemini(lower):
-        return TargetProfile(clean_cli, clean_model, "gemini", _version(lower), _gemini_style(lower))
+        return TargetProfile(
+            clean_cli, clean_model, "gemini", _version(lower), _gemini_style(lower)
+        )
     if _looks_like_qwen(lower):
         return TargetProfile(clean_cli, clean_model, "qwen", _version(lower), _qwen_style(lower))
     if _looks_like_deepseek(lower):
-        return TargetProfile(clean_cli, clean_model, "deepseek", _version(lower), _deepseek_style(lower))
+        return TargetProfile(
+            clean_cli, clean_model, "deepseek", _version(lower), _deepseek_style(lower)
+        )
     if _looks_like_minimax(lower):
-        return TargetProfile(clean_cli, clean_model, "minimax", _version(lower), _minimax_style(lower))
+        return TargetProfile(
+            clean_cli, clean_model, "minimax", _version(lower), _minimax_style(lower)
+        )
     if _looks_like_kimi(lower):
         return TargetProfile(clean_cli, clean_model, "kimi", _version(lower), _kimi_style(lower))
     if _looks_like_mimo(lower):
@@ -151,6 +161,14 @@ def _model_from_payload(data: dict) -> str | None:
     )
 
 
+def _cli_from_payload(data: dict) -> str | None:
+    """Infer the harness from fields that are specific to its hook contract."""
+    event = _first_text(data.get("hook_event_name"), data.get("hookEventName"))
+    if event == "UserPromptSubmit" and isinstance(data.get("transcript_path"), str):
+        return "claude"
+    return None
+
+
 def _model_from_env() -> str | None:
     """Best-effort active-model lookup across CLI wrappers.
 
@@ -192,6 +210,8 @@ def _cli_from_env_or_model(model: str | None) -> str | None:
             return "antigravity" if cli == "gemini" else cli
     if os.environ.get("CODEX_WORKER") or any(k.startswith("CODEX_") for k in os.environ):
         return "codex"
+    if os.environ.get("CLAUDECODE") or any(k.startswith("CLAUDE_CODE_") for k in os.environ):
+        return "claude"
     if os.environ.get("ANTHROPIC_MODEL") or os.environ.get("ANTHROPIC_BASE_URL"):
         return "claude"
     if os.environ.get("AGY_SETTINGS"):

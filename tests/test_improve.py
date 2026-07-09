@@ -8,6 +8,9 @@ import os
 import sys
 import tempfile
 from pathlib import Path
+from typing import Any, cast
+
+import pytest
 
 from tests import compat as ip
 
@@ -214,7 +217,7 @@ def test_cloud_cascade_postprocesses_output():
             "tier": "T2",
         }
 
-    stub.cheap_complete = fake_complete
+    cast(Any, stub).cheap_complete = fake_complete
     cfg.CLOUD_FALLBACK = True
     imod.CLOUD_FALLBACK = True
     old_compat = imod.compat.cheap_complete
@@ -244,27 +247,12 @@ def test_smoke_cloud_cascade_live():
     try:
         import cheap_llm  # type: ignore[import-not-found]  # noqa: F401
     except Exception:
-        try:
-            import pytest
-
-            pytest.skip("cheap_llm not importable")
-        except ImportError:
-            return
+        pytest.skip("cheap_llm not importable")
     if not os.environ.get("OPENROUTER_API_KEY"):
-        try:
-            import pytest
-
-            pytest.skip("no OPENROUTER_API_KEY")
-        except ImportError:
-            return
+        pytest.skip("no OPENROUTER_API_KEY")
     result = imod.call_cloud_cascade("fix the bug", "rewrite")
     if result is None:
-        try:
-            import pytest
-
-            pytest.skip("cloud cascade unavailable")
-        except ImportError:
-            return
+        pytest.skip("cloud cascade unavailable")
     text, src = result
     assert src.startswith("cloud:")
     assert "Contexto:" not in text
@@ -388,12 +376,12 @@ def test_choose_model_for_role_env_override():
     import prompt_improve.shared.ollama as omod
 
     orig_env = os.environ.get("OLLAMA_IMPROVE_ROLE_PROMPT_REWRITE")
+    orig_map = cfg._ROLE_MODEL_MAP.copy()
     orig_models = omod.available_ollama_models
     omod.available_ollama_models = lambda: ["custom-model:latest", "qwen3.5:4b"]
     orig_start = omod.start_ollama_best_effort
     omod.start_ollama_best_effort = lambda: True
     try:
-        orig_map = cfg._ROLE_MODEL_MAP.copy()
         cfg._ROLE_MODEL_MAP["prompt_rewrite"] = ["custom-model:latest"]
         omod._ROLE_MODEL_MAP = cfg._ROLE_MODEL_MAP
         primary, fallbacks = omod.choose_ollama_model_for_role("prompt_rewrite")
@@ -445,7 +433,9 @@ def test_fallback_chain_continues_past_model_load_failure():
     """Primary raises OllamaRequestError (HTTP 500 / VRAM load failure) → the
     chain MUST advance to the fallback and succeed, not abort."""
     mod, calls, saved, ReqErr, _Unavail, fake_chat = _patch_runner()
-    fake_chat._next = _seq_responder([ReqErr("HTTP 500: unable to load model"), _FAKE_REWRITE])
+    cast(Any, fake_chat)._next = _seq_responder(
+        [ReqErr("HTTP 500: unable to load model"), _FAKE_REWRITE]
+    )
     try:
         result = mod.call_ollama_rewrite("haz el dashboard mas rapido", cwd=None)
     finally:
@@ -462,7 +452,7 @@ def test_fallback_chain_aborts_on_daemon_down():
     """OllamaUnavailable (daemon unreachable) → abort the whole chain; do NOT
     burn time trying further models against a down daemon."""
     mod, calls, saved, _ReqErr, Unavail, fake_chat = _patch_runner()
-    fake_chat._next = _seq_responder([Unavail("connection refused")])
+    cast(Any, fake_chat)._next = _seq_responder([Unavail("connection refused")])
     try:
         result = mod.call_ollama_rewrite("haz el dashboard mas rapido", cwd=None)
     finally:
@@ -476,8 +466,8 @@ def test_fallback_chain_skips_empty_then_succeeds():
     """A model that returns empty (think-leak / no content) is skipped via
     `if not content: continue` — distinct from a load failure."""
     mod, calls, saved, _ReqErr, _Unavail, fake_chat = _patch_runner()
-    fake_chat._next = _seq_responder(["", "   ", _FAKE_REWRITE])
-    mod.choose_ollama_model_for_role = lambda role: (
+    cast(Any, fake_chat)._next = _seq_responder(["", "   ", _FAKE_REWRITE])
+    cast(Any, mod).choose_ollama_model_for_role = lambda role: (
         "primary_model",
         ["second_model", "third_model"],
     )
@@ -489,6 +479,25 @@ def test_fallback_chain_skips_empty_then_succeeds():
     _, source = result
     assert source == "ollama:third_model", f"empty models should be skipped: {source}"
     assert calls == ["primary_model", "second_model", "third_model"]
+
+
+def test_fallback_chain_respects_total_latency_budget():
+    """A slow primary must not grant every fallback another full timeout."""
+    mod, calls, saved, ReqErr, _Unavail, fake_chat = _patch_runner()
+    cast(Any, fake_chat)._next = _seq_responder([ReqErr("primary timed out")])
+    old_monotonic = mod.monotonic
+    old_budget = mod.OLLAMA_TOTAL_TIMEOUT
+    timestamps = iter((100.0, 100.0, 125.0))
+    cast(Any, mod).monotonic = lambda: next(timestamps)
+    cast(Any, mod).OLLAMA_TOTAL_TIMEOUT = 24.0
+    try:
+        result = mod.call_ollama_rewrite("haz el dashboard mas rapido", cwd=None)
+    finally:
+        cast(Any, mod).monotonic = old_monotonic
+        cast(Any, mod).OLLAMA_TOTAL_TIMEOUT = old_budget
+        _restore(mod, saved)
+    assert result is None
+    assert calls == ["primary_model"]
 
 
 def test_cloud_cascade_does_not_swallow_programmer_errors():
