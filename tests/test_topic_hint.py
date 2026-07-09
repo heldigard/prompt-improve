@@ -8,7 +8,11 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from prompt_improve.shared.paths import _topic_hint, project_hint_for_prompt
+from prompt_improve.shared.paths import (
+    _existing_path_correction,
+    _topic_hint,
+    project_hint_for_prompt,
+)
 
 
 def _write_index(bank: Path, body: str) -> None:
@@ -85,3 +89,18 @@ def test_project_hint_omits_topic_without_overlap(tmp_path: Path) -> None:
     _write_index(bank, "## Topics\n- [Auth Flow](auth-flow.md) — token lifecycle\n")
     hint = project_hint_for_prompt("fix the typo in README", str(tmp_path))
     assert hint == f"cwd={tmp_path.name}"
+
+
+def test_existing_path_correction_only_returns_verified_sibling(
+    tmp_path: Path, monkeypatch
+) -> None:
+    (tmp_path / "ollama-bench").mkdir()
+    monkeypatch.setattr(Path, "home", lambda: tmp_path)
+    hint = _existing_path_correction("revisa ~/ollama-bech/")
+    assert hint == ("verified path correction candidate: ~/ollama-bech/ -> ~/ollama-bench/")
+
+
+def test_existing_path_correction_does_not_guess_without_match(tmp_path: Path, monkeypatch) -> None:
+    (tmp_path / "unrelated").mkdir()
+    monkeypatch.setattr(Path, "home", lambda: tmp_path)
+    assert _existing_path_correction("revisa ~/ollama-bech/") == ""

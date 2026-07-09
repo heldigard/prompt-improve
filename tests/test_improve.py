@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import importlib.util
-import json
 import os
 import sys
 import tempfile
@@ -266,27 +265,12 @@ def test_role_model_map_exists():
     assert "prompt_clarify" in ip._ROLE_MODEL_MAP
 
 
-def test_role_model_map_prefers_refactor_winner():
-    """First candidate is the 2026-07-08 improve winner for both prompt roles.
-
-    Architecture verified via ollama's /api/show `details.family` rather than
-    the model NAME, because registry tags can vary.
-    """
-    import urllib.request
-
+def test_role_model_map_prefers_evidence_fidelity_winner():
+    """Both prompt roles start with the final risk-weighted improve winner."""
     for role in ("prompt_rewrite", "prompt_clarify"):
         candidates = ip._ROLE_MODEL_MAP[role]
         assert len(candidates) >= 2, f"{role} should have at least 2 candidates"
-        primary = candidates[0]
-        with urllib.request.urlopen(
-            "http://localhost:11434/api/show",
-            data=json.dumps({"name": primary}).encode(),
-            timeout=5,
-        ) as r:
-            family = json.load(r).get("details", {}).get("family", "")
-        assert family == "qwen35", (
-            f"{role} should prefer qwen35-arch first, got {primary} (family={family})"
-        )
+        assert candidates[0] == "cryptidbleh/gemma4-claude-opus-4.6:latest"
 
 
 def test_role_model_map_no_hauhaucs():
@@ -343,7 +327,7 @@ def test_choose_model_for_role_prefers_role_candidate():
     try:
         primary, fallbacks = omod.choose_ollama_model_for_role("prompt_rewrite")
         assert primary is not None
-        # OmniCoder is ahead of qwen3.5:4b in the role chain -> must win.
+        # OmniCoder remains ahead of the unranked available-model tail.
         assert "omnicoder" in primary.lower()
         assert len(fallbacks) >= 1
     finally:
@@ -536,13 +520,14 @@ def test_build_messages_clarify_includes_do_verify():
     assert "DO or VERIFY" in user
 
 
-def test_build_messages_use_codex_real_tooling_not_lsp():
+def test_build_messages_keep_tooling_neutral_to_avoid_prompt_bias():
     import prompt_improve.features.improve as m
 
     system, _ = m._build_messages("rewrite", "refactor this function safely", None)
-    assert "codeq" in system
-    assert "codescan" in system
+    assert "codeq" not in system
+    assert "codescan" not in system
     assert "LSP" not in system
+    assert "immutable evidence" in system
 
 
 def test_ollama_url_is_loopback_only():
@@ -562,7 +547,7 @@ def test_build_messages_includes_project_hint_when_continuation():
         mb.mkdir()
         (mb / "currentTask.md").write_text("- Active: test task\n", encoding="utf-8")
         _, user = m._build_messages("rewrite", "continua", d)
-        assert "Project context:" in user
+        assert "Execution context (not task scope):" in user
         assert "test task" in user
 
 
@@ -570,4 +555,4 @@ def test_build_messages_omits_hint_when_no_cwd():
     import prompt_improve.features.improve as m
 
     _, user = m._build_messages("rewrite", "fix it", None)
-    assert "Project context:" not in user
+    assert "Execution context (not task scope):" not in user

@@ -1,4 +1,4 @@
-"""Tests for prompt_improve.features.detect: detect_trivial, detect_language, has_concrete_target."""
+"""Tests for prompt classification and authority gates."""
 
 from __future__ import annotations
 
@@ -86,6 +86,10 @@ def test_has_concrete_target_true():
     assert ip.has_concrete_target("update the config.yaml timeouts")
     assert ip.has_concrete_target("edit app/components/header.tsx")
     assert ip.has_concrete_target("review src/app.py")
+    assert ip.has_concrete_target("revisa ollama bech para establecer el modelo numero uno real")
+    assert ip.has_concrete_target(
+        "revisa prompt-improve, smart-trim y ollama-client y corrige sus contratos"
+    )
 
 
 def test_has_concrete_target_false_for_vague():
@@ -93,3 +97,10 @@ def test_has_concrete_target_false_for_vague():
     assert not ip.has_concrete_target("fix the bug")
     assert not ip.has_concrete_target("add tests")
     assert not ip.has_concrete_target("mejora el rendimiento")
+
+
+def test_depends_on_conversation_context():
+    assert ip.depends_on_conversation_context("arregla lo que hablamos ayer")
+    assert ip.depends_on_conversation_context("implement what we discussed")
+    assert ip.depends_on_conversation_context("como dijimos, corrige eso")
+    assert not ip.depends_on_conversation_context("corrige el parser en src/config.py")

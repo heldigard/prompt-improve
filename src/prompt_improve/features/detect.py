@@ -13,6 +13,13 @@ from prompt_improve.shared.config import (
 )
 from prompt_improve.shared.paths import _BARE_CONTINUATION_RE
 
+_CONVERSATION_CONTEXT_RE = re.compile(
+    r"\b(?:what we (?:discussed|talked about|mentioned)|as (?:discussed|mentioned)|"
+    r"that (?:issue|thing) we discussed|lo que (?:hablamos|discutimos|mencion[eé]|mencionamos)|"
+    r"como (?:dijimos|hablamos|discutimos)|eso que (?:hablamos|mencion[eé]))\b",
+    re.IGNORECASE,
+)
+
 
 def detect_language(prompt: str) -> str:
     """Heuristic Spanish/English detector. Both accented and unaccented markers match."""
@@ -48,9 +55,37 @@ def detect_language(prompt: str) -> str:
 
 
 def has_concrete_target(prompt: str) -> bool:
-    """True when a short prompt already names a concrete file/path AND an action verb."""
+    """True when the user already supplied enough scope for the large model.
+
+    Rewriting an actionable prompt with a smaller local model can only lose
+    evidence. Paths, repository-style identifiers, or an explicit outcome
+    clause are sufficient when paired with an action verb.
+    """
+    if not _CONCRETE_ACTION_RE.search(prompt):
+        return False
     has_path = bool(_CONCRETE_FILE_RE.search(prompt)) or "/" in prompt or "\\" in prompt
-    return has_path and bool(_CONCRETE_ACTION_RE.search(prompt))
+    has_repo_name = bool(re.search(r"\b[a-z0-9]+(?:-[a-z0-9]+)+\b", prompt, re.IGNORECASE))
+    has_explicit_outcome = bool(
+        len(prompt.split()) >= 8
+        and re.search(
+            r"\b(?:para\s+(?:saber|establecer|identificar|encontrar|corregir|"
+            r"mejorar|verificar|determinar)|so that|in order to|to (?:find|identify|"
+            r"determine|verify|establish|fix|improve))\b",
+            prompt,
+            re.IGNORECASE,
+        )
+    )
+    return has_path or has_repo_name or has_explicit_outcome
+
+
+def depends_on_conversation_context(prompt: str) -> bool:
+    """Return whether only the downstream model can resolve the reference.
+
+    The submit hook receives the current prompt and cwd, not the conversation
+    transcript. Rewriting these prompts locally would discard evidence that is
+    still available to the large model consuming the original prompt.
+    """
+    return bool(_CONVERSATION_CONTEXT_RE.search(prompt))
 
 
 def detect_trivial(prompt: str) -> bool:

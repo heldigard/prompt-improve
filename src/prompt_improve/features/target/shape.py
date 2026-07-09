@@ -88,7 +88,7 @@ def _variant_guidance(target: TargetProfile) -> str:
         if target.cli == "codex" or "codex" in lower:
             notes.append(
                 "Codex note: include relevant files/context when known, plan first "
-                "for difficult work, describe tools crisply, parallelize independent "
+                "for difficult work, describe evidence crisply, parallelize independent "
                 "reads, and verify with the smallest useful check."
             )
         return " ".join(notes)
@@ -148,14 +148,14 @@ SHAPES: dict[str, FamilyShape] = {
             "Mitigation: state ONE imperative objective — vague scope triggers "
             "over-exploration. Separate <context> from <instructions> so source "
             "material is not conflated with directives. End with a verification the "
-            "agent runs (test, grep, or LSP refs)."
+            "agent performs, chosen for the task (source comparison, focused test, or reference check)."
         ),
     ),
     "openai-gpt": FamilyShape(
         family="openai-gpt",
         rewrite=(
             "Target model profile: OpenAI GPT/Codex. Output clean Markdown sections "
-            "with an outcome-first contract, concrete tool-use or verification "
+            "with an outcome-first contract, concrete evidence or verification "
             "rules when inferable, and backticks around file paths/functions/classes. "
             "Separate instructions from the user's original input; do not use XML."
         ),
@@ -193,8 +193,8 @@ SHAPES: dict[str, FamilyShape] = {
     "qwen": FamilyShape(
         family="qwen",
         rewrite=(
-            "Target model profile: Qwen. Use direct, numbered Markdown with exact "
-            "file paths, flags, and literals — Qwen follows literal instructions "
+            "Target model profile: Qwen. Use direct, numbered Markdown and preserve exact "
+            "file paths, flags, and literals when the user supplied them — Qwen follows literal instructions "
             "well but needs unambiguous references. Avoid discretionary phrasing."
         ),
         clarify=(

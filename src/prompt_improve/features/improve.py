@@ -121,7 +121,7 @@ def _build_messages(
     """
     language = detect_language(prompt)
     hint = project_hint_for_prompt(prompt, cwd)
-    hint_line = f"Project context: {hint}\n" if hint else ""
+    hint_line = f"Execution context (not task scope): {hint}\n" if hint else ""
     if mode == "rewrite":
         system = build_rewrite_system_prompt(language, target)
         user = f"Respond and write the rewritten prompt in {language}.\n{hint_line}\nOriginal prompt:\n{prompt}"

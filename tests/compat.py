@@ -22,6 +22,7 @@ from prompt_improve.shared.cache import (  # noqa: F401
     save_cached,
 )
 from prompt_improve.shared.paths import (  # noqa: F401
+    _existing_path_correction,
     project_hint as _project_hint,
     project_hint_for_prompt as _project_hint_for_prompt,
     project_current_task_line,
@@ -29,6 +30,7 @@ from prompt_improve.shared.paths import (  # noqa: F401
     should_include_task_hint,
 )
 from prompt_improve.features.detect import (  # noqa: F401
+    depends_on_conversation_context,
     detect_trivial,
     detect_language,
     has_concrete_target,
@@ -42,6 +44,7 @@ from prompt_improve.features.clean import (  # noqa: F401
     trim_bullet as _trim_bullet,
     remove_long_examples as _remove_long_examples,
     sanitize_bullet as _sanitize_bullet,
+    introduces_unsupported_specifics,
 )
 from prompt_improve.features.rules import (  # noqa: F401
     build_rewrite_system_prompt,

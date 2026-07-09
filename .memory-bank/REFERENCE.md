@@ -1,7 +1,7 @@
 # REFERENCE - Stable Facts
 
-## Model benchmarks (2026-07-08 PM re-bench, Ollama 0.31.1)
-- Active chain: **OmniCoder-Qwen3.5-9B** (improve #1) → **Negentropy Claude Opus 4.7 9B** (improve #2 combined) → **SetneufPT/Qwopus3.5-4B-Coder-MTP** (structured/tool-call winner) → **cryptidbleh/gemma4-claude-opus-4.6** (small universal fallback).
+## Model benchmarks (2026-07-09 fidelity re-bench, Ollama 0.31.2)
+- Active chain: **cryptidbleh/gemma4-claude-opus-4.6** (risk-weighted improve #1) → **Negentropy Claude Opus 4.7 9B** → **SetneufPT/Qwopus3.5-4B-Coder-MTP** → **OmniCoder-Qwen3.5-9B**.
 - Source of truth in code: `shared/config.py::_DEFAULT_IMPROVE_CHAIN`; missing models degrade gracefully through the available-model tail.
 - `OLLAMA_IMPROVE_MODELS` overrides the global chain; role-specific overrides take precedence for rewrite/clarify.
 - Superseded defaults include Grug-12B, pegasus912, Librellama/gemma4:e2b, qwen3.5:4b, Huihui-gemma-4-12B, and MobiusDevelopment/gemma-4-12B.

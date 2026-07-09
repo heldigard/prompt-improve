@@ -230,6 +230,27 @@ def test_command_main_passthrough_on_trivial_prompt():
     assert json.loads(out) == {"continue": True}
 
 
+def test_command_main_preserves_actionable_research_prompt():
+    """Regression: a small local model must not reinterpret a named ranking
+    review as a language migration or generic quality scan."""
+    prompt = (
+        "revisa ollama bech para establecer el modelo numero uno real y "
+        "corregir la deuda mencionada"
+    )
+    out = _run_main_via_stdin(prompt, cwd="/home/eldi/codeq")
+    assert json.loads(out) == {"continue": True}
+
+
+def test_command_main_preserves_long_multi_repo_scope():
+    prompt = (
+        "Revisa prompt-improve, smart-trim, ollama-client y ollama-bench. "
+        "Analiza sus contratos y corrige cualquier deriva verificable sin "
+        "sacrificar la precision del modelo principal."
+    )
+    out = _run_main_via_stdin(prompt, cwd="/home/eldi/prompt-improve")
+    assert json.loads(out) == {"continue": True}
+
+
 def test_command_main_falls_through_when_no_model_available():
     """When LLM fails AND rule fallback yields nothing, emit bare continue."""
     # "asdfgh" with no TASK_VERBS and no Spanish markers — rule-based yields
@@ -245,6 +266,23 @@ def test_command_main_falls_through_when_no_model_available():
     # Either bare continue (no improvement available) or hint — but never raises.
     parsed = json.loads(out)
     assert parsed.get("continue") is True
+
+
+def test_command_passthrough_for_conversation_context_reference():
+    """The hook must not rewrite evidence it cannot see but the brain can."""
+    import prompt_improve.command as cmd
+
+    original = cmd.route_and_improve
+
+    def fail_if_called(*_args, **_kwargs):
+        raise AssertionError("local model must not be called")
+
+    cmd.route_and_improve = fail_if_called
+    try:
+        out = _run_main_via_stdin("arregla lo que hablamos ayer", cwd="/nonexistent")
+    finally:
+        cmd.route_and_improve = original
+    assert json.loads(out) == {"continue": True}
 
 
 def test_command_main_emits_additional_context_on_rewrite():

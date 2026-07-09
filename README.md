@@ -1,11 +1,11 @@
 # prompt-improve
 
-LLM-powered prompt improvement hook for the local CLI ecosystem. Rewrites vague
-prompts into structured specs and clarifies long prompts with actionable bullets.
+LLM-powered prompt improvement hook for the local CLI ecosystem. It preserves
+actionable prompts and only rewrites or clarifies genuinely underspecified input.
 
 ## Features
 
-- **Role-based model routing**: `OmniCoder-Qwen3.5-9B` (improve #1) → `Negentropy-claude-opus-4.7-9B` (improve #2) → `SetneufPT/Qwopus3.5-4B-Coder-MTP` (tool_call/structured #1) → `cryptidbleh/gemma4-claude-opus-4.6` (small universal fallback). Override the whole chain via `OLLAMA_IMPROVE_MODELS`; per-role via `OLLAMA_IMPROVE_ROLE_PROMPT_REWRITE` / `OLLAMA_IMPROVE_ROLE_PROMPT_CLARIFY`
+- **Role-based model routing**: `cryptidbleh/gemma4-claude-opus-4.6` (evidence-fidelity #1) → `Negentropy-claude-opus-4.7-9B` → `SetneufPT/Qwopus3.5-4B-Coder-MTP` → `OmniCoder-Qwen3.5-9B`. Override the whole chain via `OLLAMA_IMPROVE_MODELS`; per-role via `OLLAMA_IMPROVE_ROLE_PROMPT_REWRITE` / `OLLAMA_IMPROVE_ROLE_PROMPT_CLARIFY`
 - **Target-aware prompt shaping**: detects the receiving CLI/model family and
   shapes the improved prompt in two dimensions — **format** (XML vs Markdown vs
   component blocks) and **behavior** (per-family failure-mode mitigations, e.g.
@@ -13,10 +13,12 @@ prompts into structured specs and clarifies long prompts with actionable bullets
   MiniMax's exploration loop, Kimi's subagent-model forcing)
 - **Cloud escalation**: complex prompts (security, architecture, migration) routed to DeepSeek V4 Flash
 - **Language-aware**: detects Spanish/English, preserves user language
-- **Project-grounded**: reads `.memory-bank/currentTask.md` for context
-- **Ecosystem-aware tooling hints**: avoids nonexistent LSP assumptions in
-  Codex paths and nudges agents toward `codeq` for code facts and `codescan`
-  for quality sensors
+- **Evidence-grounded**: preserves named projects, paths, model identifiers,
+  and relationships; verifies close `~/path` typo candidates before exposing them
+- **Minimal authority**: actionable prompts pass through unchanged so a small
+  local model cannot dilute the large model's reasoning or invent task scope
+- **Tool-neutral shaping**: the receiving CLI chooses tools from its own live
+  capabilities; the improver does not prime unrelated tools into the task
 - **Deterministic continuation**: bare "continua" prompts get memory-based expansion (no LLM)
 - **Cached**: 5-minute TTL cache per project scope and target model profile
 
@@ -36,11 +38,12 @@ cd ~/prompt-improve && python3 -m pytest tests/ -q
 
 The hook fires on every user prompt via `~/.claude/settings.json` (UserPromptSubmit)
 and can also be called directly as `python3 ~/.claude/hooks/prompt-improve.py "prompt"`.
-It classifies the prompt, selects the best local model, and either:
+It first passes through prompts that already name a path/repository or explicit
+outcome. For genuinely underspecified prompts it selects a local model and either:
 - **Rewrites** short/vague prompts (<260 chars) into structured specs
 - **Clarifies** longer prompts with 1-3 action bullets
 
-If the local Ollama daemon is down, it falls back to a cloud cascade (Ling).
+If the local Ollama daemon is down, it falls back to the configured cloud cascade.
 If the prompt is hard (security/architecture/migration), it escalates to DeepSeek V4 Flash.
 
 ## Target profiles

@@ -28,17 +28,16 @@ OLLAMA_PID = os.path.expanduser("~/.ollama/ollama-serve.pid")
 # ---------------------------------------------------------------------------
 # Model candidates (global fallback)
 # ---------------------------------------------------------------------------
-# Default chain = 2026-07-08 PM re-bench winners. OmniCoder is improve #1 (held;
-# also bug_finding #1) -> Negentropy-claude-opus-4.7-9B (improve #2 combined) ->
-# SetneufPT/Qwopus3.5-4B-Coder-MTP (tool_call/pdf_extract/structured #1) ->
-# cryptidbleh/gemma4-claude-opus-4.6 as the small universal fallback. The full available-model tail is
-# appended at runtime by choose_ollama_model_for_role, so this is prioritization,
-# not a hard dependency.
+# Default chain = 2026-07-09 evidence-fidelity re-bench. Cryptid leads the
+# risk-weighted improve cases, followed by Negentropy 9B and Qwopus. OmniCoder
+# remains a late fallback because it still leads bug finding, but it overreached
+# on prompt rewriting. The available-model tail is appended at runtime, so this
+# is prioritization, not a hard dependency.
 _DEFAULT_IMPROVE_CHAIN = (
-    "zfujicute/OmniCoder-Qwen3.5-9B-Claude-4.6-Opus-Uncensored-v2-GGUF:latest,"
+    "cryptidbleh/gemma4-claude-opus-4.6:latest,"
     "hf.co/Jackrong/Negentropy-claude-opus-4.7-9B-GGUF:Q4_K_M,"
     "SetneufPT/Qwopus3.5-4B-Coder-MTP_Q4_64k_8GB-GPU:latest,"
-    "cryptidbleh/gemma4-claude-opus-4.6:latest"
+    "zfujicute/OmniCoder-Qwen3.5-9B-Claude-4.6-Opus-Uncensored-v2-GGUF:latest"
 )
 
 OLLAMA_MODEL_CANDIDATES = [
@@ -71,7 +70,7 @@ for _role, _default in [
 # ---------------------------------------------------------------------------
 CACHE_DIR = Path.home() / ".claude" / "cache" / "prompt-improve"
 CACHE_TTL_SECONDS = float(os.environ.get("OLLAMA_IMPROVE_CACHE_TTL", "300.0"))
-CACHE_SCHEMA_VERSION = "prompt-improve-v18"
+CACHE_SCHEMA_VERSION = "prompt-improve-v19"
 
 # ---------------------------------------------------------------------------
 # Rewrite threshold

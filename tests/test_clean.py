@@ -67,6 +67,38 @@ def test_clean_rewrite_softens_absolute_in_output():
     assert "100% coverage" not in cleaned
 
 
+def test_clean_rewrite_rejects_invented_language_and_quality_tool():
+    raw = "Implement the fix in Go and run codescan across the project."
+    assert ip._clean_rewrite(raw, "review the benchmark ranking") is None
+
+
+def test_clean_rewrite_rejects_invented_filesystem_path():
+    raw = "Inspect `~/ollama-models/cache/` and rank models by size."
+    assert ip._clean_rewrite(raw, "review ollama bench and find the best model") is None
+
+
+def test_clean_rewrite_allows_specifics_present_in_original():
+    raw = "Review `~/ollama-bench/results/` and verify the Python scorer."
+    original = "review ~/ollama-bench/results/ and its Python scorer"
+    assert ip._clean_rewrite(raw, original) is not None
+
+
+def test_clean_rewrite_does_not_treat_english_go_as_language_choice():
+    raw = "Review the evidence. Go through the relevant documentation."
+    assert ip._clean_rewrite(raw, "review the documentation") is not None
+
+
+def test_clean_rewrite_rejects_invented_go_project():
+    raw = "Rewrite this as a Go project and verify the implementation."
+    assert ip._clean_rewrite(raw, "review the service") is None
+
+
+def test_clean_rewrite_allows_verified_close_path_correction():
+    raw = "Review `~/ollama-bench/` and identify the role-specific winner."
+    original = "review ~/ollama-bech/ and identify the winner"
+    assert ip._clean_rewrite(raw, original) is not None
+
+
 def test_trim_bullet_short_line_unchanged():
     assert ip._trim_bullet("short line") == "short line"
 
