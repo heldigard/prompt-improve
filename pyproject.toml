@@ -27,10 +27,11 @@ dependencies = []
 [project.optional-dependencies]
 test = ["pytest>=8", "pytest-cov>=5", "ruff>=0.6"]
 
-# NOTE: no [project.scripts] — prompt-improve is a HOOK invoked as
-# `python3 ~/.claude/hooks/prompt-improve.py` (a thin shim that imports this
-# package), NOT a CLI console script. The shim preserves the wired path so
-# settings.json keeps resolving untouched.
+[project.scripts]
+prompt-improve = "prompt_improve.command:main"
+
+# The hook path remains wired via `python3 ~/.claude/hooks/prompt-improve.py`.
+# The console script makes the graduated package directly callable too.
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
