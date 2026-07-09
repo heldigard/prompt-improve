@@ -1,12 +1,10 @@
 # REFERENCE - Stable Facts
 
-## Model benchmarks (2026-07-05 re-bench — improve task, Ollama 0.31.1, round-3 update)
-- Primary: **hf.co/kai-os/Grug-12B-GGUF:Q4_K_M** (improve #1; gemma4-12B compact-reasoning fine-tune, won improve by 2× on hard prompts: 8.39 vs 4.15 over pegasus912). Matches `shared/config.py::_DEFAULT_IMPROVE_CHAIN` + `~/ollama-bench/RANKING.md`. See `~/ollama-bench/.memory-bank/topics/candidates-round-3-2026-07-05.md`.
-- #2: **hf.co/pegasus912/gemma-4-12b-it-qat-heretic-ud-q4-k-xl:latest** (improve #2; demoted 2026-07-05; same gemma4-12B family, kept as fallback for diversity)
-- #3: **Librellama/gemma4:e2b-Uncensored** (improve #3 + codeq_sum #1)
-- Anchor fallback: **qwen3.5:4b** (universal — last in chain, always works)
-- Chain in code: `Grug-12B → pegasus912 → Librellama/gemma4:e2b → qwen3.5:4b` (all installed). Full available-model tail appended at runtime by `choose_ollama_model_for_role`; missing models degrade gracefully.
-- Superseded: `Huihui-gemma-4-12B-abliterated` (was primary in the OLD `~/bench/ollama/` bench; ranked outside top-5 in the 2026-07-04 re-bench and REMOVED from the host lineup — no longer a safe default). `MobiusDevelopment/gemma-4-12B-it-qat` (uninstalled, was codeq default — also superseded).
+## Model benchmarks (2026-07-08 PM re-bench, Ollama 0.31.1)
+- Active chain: **OmniCoder-Qwen3.5-9B** (improve #1) → **Negentropy Claude Opus 4.7 9B** (improve #2 combined) → **SetneufPT/Qwopus3.5-4B-Coder-MTP** (structured/tool-call winner) → **cryptidbleh/gemma4-claude-opus-4.6** (small universal fallback).
+- Source of truth in code: `shared/config.py::_DEFAULT_IMPROVE_CHAIN`; missing models degrade gracefully through the available-model tail.
+- `OLLAMA_IMPROVE_MODELS` overrides the global chain; role-specific overrides take precedence for rewrite/clarify.
+- Superseded defaults include Grug-12B, pegasus912, Librellama/gemma4:e2b, qwen3.5:4b, Huihui-gemma-4-12B, and MobiusDevelopment/gemma-4-12B.
 - Bench source of truth: **`~/ollama-bench/RANKING.md`** (the vertical-slice successor to the old `~/bench/ollama/`).
 
 ### Caveat: leak-detector coverage (RESOLVED 2026-07-04)
@@ -45,3 +43,4 @@ The NEW `~/ollama-bench` scorer now ALSO detects `<|channel>` (added to `LEAK_PA
 - `OLLAMA_IMPROVE_ROLE_PROMPT_CLARIFY` — override clarify role models
 - `OLLAMA_IMPROVE_CLOUD_INTELLIGENCE=0` — disable hard-prompt cloud escalation
 - `OLLAMA_IMPROVE_CLOUD_FALLBACK=0` — disable cloud availability fallback
+- `OLLAMA_IMPROVE_TOTAL_TIMEOUT` — wall-clock budget shared by local model attempts (default 24s)

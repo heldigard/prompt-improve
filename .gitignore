@@ -28,3 +28,6 @@ htmlcov/
 
 # uv lockfile — hook/package, not a deployable app
 uv.lock
+
+# cli-orchestration: cross-CLI coordination registry (runtime noise, auto-managed)
+.memory-bank/blocked-writes.log
