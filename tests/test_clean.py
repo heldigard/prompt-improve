@@ -188,3 +188,20 @@ def test_clean_rewrite_strips_preamble():
     assert result is not None
     assert "here is" not in result.lower()
     assert "Fix the authentication" in result
+
+
+def test_clean_rewrite_rejects_oversized_output_without_truncating() -> None:
+    raw = "Task: fix the bug.\n\n" + ("Context word " * 150)
+    assert ip._clean_rewrite(raw, "fix the bug") is None
+
+
+def test_clean_rewrite_accepts_compact_spec_near_contract() -> None:
+    raw = (
+        "Task: fix the bug.\n"
+        "Context: inspect the existing implementation and preserve the public API.\n"
+        "Acceptance criteria: tests cover the regression and the original behavior."
+    )
+    result = ip._clean_rewrite(raw, "fix the bug")
+    assert result is not None
+    assert len(result) <= 900
+    assert len(result.split()) <= 140

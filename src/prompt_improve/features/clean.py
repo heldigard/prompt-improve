@@ -17,6 +17,12 @@ _UNSUPPORTED_TECH_RE = re.compile(
     re.IGNORECASE,
 )
 
+# Rewrite output is advisory context, not a replacement for the user's request.
+# Keep both a word and character contract so a verbose local/cloud response
+# cannot consume the controller's context window or be cut mid-specification.
+MAX_REWRITE_WORDS = 140
+MAX_REWRITE_CHARS = 900
+
 
 def _technology_tokens(value: str) -> set[str]:
     tokens = {match.group(0).lower() for match in _UNSUPPORTED_TECH_RE.finditer(value)}
@@ -152,5 +158,9 @@ def clean_rewrite(text: str, original: str) -> str | None:
     lines = [ln.rstrip() for ln in text.splitlines()]
     text = re.sub(r"\n{3,}", "\n\n", "\n".join(lines)).strip()
     if len(text) < 20 or text.lower() == original.strip().lower():
+        return None
+    # Reject rather than truncate: cutting a path, negation, or acceptance
+    # criterion would create a plausible-looking but semantically corrupt spec.
+    if len(text) > MAX_REWRITE_CHARS or len(text.split()) > MAX_REWRITE_WORDS:
         return None
     return text

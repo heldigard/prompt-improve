@@ -184,7 +184,10 @@ def call_ollama_rewrite(
         cache_mode,
         cwd,
         temperature=0.2,
-        num_predict=600,
+        # The cleaner accepts at most 140 words / 900 chars. Keep generation
+        # bounded too, so rejected verbosity does not burn the interactive
+        # hook's local-model budget.
+        num_predict=320,
         num_ctx=8192,
         timeout_first=OLLAMA_TIMEOUT,
         timeout_fallback=min(OLLAMA_TIMEOUT, 30.0),

@@ -70,7 +70,7 @@ for _role, _default in [
 # ---------------------------------------------------------------------------
 CACHE_DIR = Path.home() / ".claude" / "cache" / "prompt-improve"
 CACHE_TTL_SECONDS = float(os.environ.get("OLLAMA_IMPROVE_CACHE_TTL", "300.0"))
-CACHE_SCHEMA_VERSION = "prompt-improve-v19"
+CACHE_SCHEMA_VERSION = "prompt-improve-v20"
 
 # ---------------------------------------------------------------------------
 # Rewrite threshold
