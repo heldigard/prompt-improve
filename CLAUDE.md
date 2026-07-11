@@ -16,14 +16,15 @@ prompt-improve is a **UserPromptSubmit hook**, not a CLI. Entry point is
 
 ```
 src/prompt_improve/
-  shared/        config, compat, ollama, cache, paths (infra; no feature deps)
+  shared/        config, compat, ollama, ollama_url, cache, paths (infra; no feature deps)
   features/
-    detect/      language, trivial detection, concrete target, mode
-    classify/    hard-prompt signals, domain/intent regex
-    improve/     LLM calls (ollama clarify/rewrite, cloud cascade, router)
-    clean/       output cleaning, bullet trimming, soften absolutes
-    rules/       rule-based suggestions, system prompts
-    hints/       project hints, continuation context
+    detect.py    language, trivial detection, concrete target, mode
+    classify.py  hard-prompt signals, domain/intent regex
+    improve.py   LLM calls (ollama clarify/rewrite, cloud cascade, router)
+    clean.py     output cleaning, bullet trimming, soften absolutes
+    rules.py     rule-based suggestions, system prompts
+    hints.py     project hints, continuation context
+    target/      receiving CLI/model profile + prompt shaping (profile, shape)
   command.py     main() entry point
 scripts/
   ollama-warmup.sh   best-effort Ollama warmup (SessionStart + cron)
@@ -46,7 +47,7 @@ scripts/
 
 Two tiers:
 1. **Local** (Ollama): role-based selection via `_ROLE_MODEL_MAP`
-   (SetneufPT/Qwopus3.5 primary, OmniCoder/functiongemma fallback, qwen3.5:4b compatibility tail).
+   (cryptidbleh primary, Negentropy/Qwopus/OmniCoder fallbacks by current ranking).
 2. **Cloud**: hard-prompt escalation to DeepSeek V4 Flash; availability fallback
    to Ling cascade when Ollama is down.
 

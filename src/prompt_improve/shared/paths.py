@@ -6,6 +6,7 @@ from __future__ import annotations
 import importlib.util
 import re
 from datetime import UTC, date, datetime
+from difflib import get_close_matches
 from pathlib import Path
 from typing import Any
 
@@ -40,6 +41,7 @@ _COMPLETED_HEADING_RE = re.compile(
 )
 _CHECKED_TASK_RE = re.compile(r"^\s*[-*]\s+\[[xX]\]\s+")
 _UNCHECKED_TASK_RE = re.compile(r"^\s*[-*]\s+\[\s\]\s+")
+_HOME_PATH_RE = re.compile(r"~/[^\s`'\"<>|]+")
 
 
 def _load_project_memory() -> Any:
@@ -261,6 +263,39 @@ def _topic_hint(prompt: str, root: Path, max_scan: int = 40) -> str:
     return f"topic={best_slug} ({best_title})"
 
 
+def _existing_path_correction(prompt: str) -> str:
+    """Return a verified close path for one mistyped ``~/...`` reference.
+
+    The model must not guess that ``ollama-bech`` is a language, tool, or file
+    inside the current repo when ``~/ollama-bench`` actually exists. Only
+    explicit home-relative paths are considered and only an existing sibling
+    can become a hint.
+    """
+    for match in _HOME_PATH_RE.finditer(prompt):
+        raw = match.group(0).rstrip(".,;:!?)]}")
+        requested = Path.home() / raw.removeprefix("~/")
+        try:
+            if requested.exists() or not requested.parent.is_dir():
+                continue
+            names = [entry.name for entry in requested.parent.iterdir()]
+        except OSError:
+            continue
+        close = get_close_matches(requested.name, names, n=1, cutoff=0.8)
+        if not close:
+            continue
+        candidate = requested.parent / close[0]
+        try:
+            if not candidate.exists():
+                continue
+        except OSError:
+            continue
+        shown = f"~/{candidate.relative_to(Path.home())}"
+        if match.group(0).endswith("/"):
+            shown += "/"
+        return f"verified path correction candidate: {raw} -> {shown}"
+    return ""
+
+
 def project_hint_for_prompt(prompt: str, cwd: str | None) -> str:
     """Project anchor used by the LLM prompt improver (cwd + currentTask + topic)."""
     if not cwd:
@@ -279,4 +314,7 @@ def project_hint_for_prompt(prompt: str, cwd: str | None) -> str:
         hint = _topic_hint(prompt, root)
         if hint:
             base = f"{base}; {hint}"
+    path_hint = _existing_path_correction(prompt)
+    if path_hint:
+        base = f"{base}; {path_hint}"
     return base

@@ -6,6 +6,7 @@ from __future__ import annotations
 import os
 import sys
 from collections.abc import Callable
+from time import monotonic
 
 from prompt_improve.features.classify import needs_cloud_intelligence
 from prompt_improve.features.clean import clean_response, clean_rewrite
@@ -19,7 +20,12 @@ from prompt_improve.features.target import (
 )
 from prompt_improve.shared import compat
 from prompt_improve.shared.cache import load_cached, save_cached
-from prompt_improve.shared.config import CLOUD_FALLBACK, OLLAMA_TIMEOUT, OLLAMA_URL
+from prompt_improve.shared.config import (
+    CLOUD_FALLBACK,
+    OLLAMA_TIMEOUT,
+    OLLAMA_TOTAL_TIMEOUT,
+    OLLAMA_URL,
+)
 from prompt_improve.shared.ollama import choose_ollama_model_for_role
 from prompt_improve.shared.paths import project_hint_for_prompt
 
@@ -58,8 +64,14 @@ def _run_ollama_models(
     # the cap rarely truncates a preferred model.
     models = ([primary] + fallbacks)[:6]
     _debug(f"role={role} chain={[m.split(':')[0] for m in models]}")
+    started = monotonic()
     for index, model in enumerate(models):
-        timeout = timeout_first if index == 0 else timeout_fallback
+        remaining = OLLAMA_TOTAL_TIMEOUT - (monotonic() - started)
+        if remaining < 0.1:
+            _debug(f"role={role} exhausted {OLLAMA_TOTAL_TIMEOUT:.1f}s total budget")
+            break
+        per_model_timeout = timeout_first if index == 0 else timeout_fallback
+        timeout = min(per_model_timeout, remaining)
         try:
             content = compat.ollama_client.chat(
                 messages,
@@ -109,7 +121,7 @@ def _build_messages(
     """
     language = detect_language(prompt)
     hint = project_hint_for_prompt(prompt, cwd)
-    hint_line = f"Project context: {hint}\n" if hint else ""
+    hint_line = f"Execution context (not task scope): {hint}\n" if hint else ""
     if mode == "rewrite":
         system = build_rewrite_system_prompt(language, target)
         user = f"Respond and write the rewritten prompt in {language}.\n{hint_line}\nOriginal prompt:\n{prompt}"
@@ -172,7 +184,10 @@ def call_ollama_rewrite(
         cache_mode,
         cwd,
         temperature=0.2,
-        num_predict=600,
+        # The cleaner accepts at most 140 words / 900 chars. Keep generation
+        # bounded too, so rejected verbosity does not burn the interactive
+        # hook's local-model budget.
+        num_predict=320,
         num_ctx=8192,
         timeout_first=OLLAMA_TIMEOUT,
         timeout_fallback=min(OLLAMA_TIMEOUT, 30.0),

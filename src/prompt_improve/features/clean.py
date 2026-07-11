@@ -3,9 +3,62 @@
 from __future__ import annotations
 
 import re
+from difflib import SequenceMatcher
+from pathlib import Path
 
 from prompt_improve.features.detect import detect_language
 from prompt_improve.shared.config import _ABSOLUTE_REPLACEMENTS
+
+_PATH_LITERAL_RE = re.compile(r"(?<![\w.])(?:~/|/)[A-Za-z0-9._+@:-]+(?:/[A-Za-z0-9._+@:-]+)*/?")
+_UNSUPPORTED_TECH_RE = re.compile(
+    r"\b(?:codescan|golang|python|django|fastapi|java|spring(?: boot)?|javascript|"
+    r"typescript|react|angular|vue|rust|kubernetes|docker|terraform|postgresql|"
+    r"mysql|mongodb|redis|maven|gradle)\b",
+    re.IGNORECASE,
+)
+
+# Rewrite output is advisory context, not a replacement for the user's request.
+# Keep both a word and character contract so a verbose local/cloud response
+# cannot consume the controller's context window or be cut mid-specification.
+MAX_REWRITE_WORDS = 140
+MAX_REWRITE_CHARS = 900
+
+
+def _technology_tokens(value: str) -> set[str]:
+    tokens = {match.group(0).lower() for match in _UNSUPPORTED_TECH_RE.finditer(value)}
+    if re.search(
+        r"\b(?:(?:written|implemented|coded) in|using|language|stack)\s+Go\b|"
+        r"\bGo(?:lang)?\s+(?:code|project|module|package|service|implementation)\b",
+        value,
+    ):
+        tokens.add("go-language")
+    return tokens
+
+
+def _verified_close_path(path: str, originals: set[str]) -> bool:
+    candidate = Path(path).expanduser()
+    try:
+        if not candidate.exists():
+            return False
+    except OSError:
+        return False
+    normalized = path.rstrip("/")
+    return any(SequenceMatcher(None, normalized, old).ratio() >= 0.8 for old in originals)
+
+
+def introduces_unsupported_specifics(text: str, original: str) -> bool:
+    """Reject model-added stack choices and concrete paths.
+
+    A prompt rewrite may organize evidence, but it must not decide a language,
+    framework, quality tool, or filesystem location absent from the user input.
+    """
+    original_paths = {path.rstrip("/") for path in _PATH_LITERAL_RE.findall(original)}
+    for path in _PATH_LITERAL_RE.findall(text):
+        if path.rstrip("/") not in original_paths and not _verified_close_path(
+            path, original_paths
+        ):
+            return True
+    return not _technology_tokens(text).issubset(_technology_tokens(original))
 
 
 def soften_invented_absolutes(text: str) -> str:
@@ -99,9 +152,15 @@ def clean_rewrite(text: str, original: str) -> str | None:
         "",
         text,
     )
+    if introduces_unsupported_specifics(text, original):
+        return None
     text = soften_invented_absolutes(text)
     lines = [ln.rstrip() for ln in text.splitlines()]
     text = re.sub(r"\n{3,}", "\n\n", "\n".join(lines)).strip()
     if len(text) < 20 or text.lower() == original.strip().lower():
+        return None
+    # Reject rather than truncate: cutting a path, negation, or acceptance
+    # criterion would create a plausible-looking but semantically corrupt spec.
+    if len(text) > MAX_REWRITE_CHARS or len(text.split()) > MAX_REWRITE_WORDS:
         return None
     return text

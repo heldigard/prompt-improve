@@ -6,7 +6,12 @@ import json
 import os
 import sys
 
-from prompt_improve.features.detect import decide_mode, detect_trivial, has_concrete_target
+from prompt_improve.features.detect import (
+    decide_mode,
+    depends_on_conversation_context,
+    detect_trivial,
+    has_concrete_target,
+)
 from prompt_improve.features.hints import continuation_context
 from prompt_improve.features.improve import route_and_improve
 from prompt_improve.features.rules import rule_based_suggestions
@@ -139,7 +144,16 @@ def main() -> None:
 
     mode = decide_mode(prompt)
 
-    if mode == "rewrite" and has_concrete_target(prompt):
+    # The hook cannot see prior turns. Preserve anaphoric prompts so the large
+    # model can resolve them against its own conversation context.
+    if depends_on_conversation_context(prompt):
+        print(prompt) if direct_cli else _passthrough()
+        return
+
+    # Preserve prompts that already give the large model an actionable scope.
+    # This applies to both modes: unsolicited "clarification" can dilute a long,
+    # precise request just as easily as a full rewrite can.
+    if has_concrete_target(prompt):
         print(prompt) if direct_cli else _passthrough()
         return
 

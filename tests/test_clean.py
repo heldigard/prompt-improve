@@ -63,7 +63,40 @@ def test_clean_rewrite_strips_english_validation_questions():
 def test_clean_rewrite_softens_absolute_in_output():
     raw = "Add tests.\n\nAcceptance criteria: 100% coverage of all logic."
     cleaned = ip._clean_rewrite(raw, "add tests")
+    assert cleaned is not None
     assert "100% coverage" not in cleaned
+
+
+def test_clean_rewrite_rejects_invented_language_and_quality_tool():
+    raw = "Implement the fix in Go and run codescan across the project."
+    assert ip._clean_rewrite(raw, "review the benchmark ranking") is None
+
+
+def test_clean_rewrite_rejects_invented_filesystem_path():
+    raw = "Inspect `~/ollama-models/cache/` and rank models by size."
+    assert ip._clean_rewrite(raw, "review ollama bench and find the best model") is None
+
+
+def test_clean_rewrite_allows_specifics_present_in_original():
+    raw = "Review `~/ollama-bench/results/` and verify the Python scorer."
+    original = "review ~/ollama-bench/results/ and its Python scorer"
+    assert ip._clean_rewrite(raw, original) is not None
+
+
+def test_clean_rewrite_does_not_treat_english_go_as_language_choice():
+    raw = "Review the evidence. Go through the relevant documentation."
+    assert ip._clean_rewrite(raw, "review the documentation") is not None
+
+
+def test_clean_rewrite_rejects_invented_go_project():
+    raw = "Rewrite this as a Go project and verify the implementation."
+    assert ip._clean_rewrite(raw, "review the service") is None
+
+
+def test_clean_rewrite_allows_verified_close_path_correction():
+    raw = "Review `~/ollama-bench/` and identify the role-specific winner."
+    original = "review ~/ollama-bech/ and identify the winner"
+    assert ip._clean_rewrite(raw, original) is not None
 
 
 def test_trim_bullet_short_line_unchanged():
@@ -155,3 +188,20 @@ def test_clean_rewrite_strips_preamble():
     assert result is not None
     assert "here is" not in result.lower()
     assert "Fix the authentication" in result
+
+
+def test_clean_rewrite_rejects_oversized_output_without_truncating() -> None:
+    raw = "Task: fix the bug.\n\n" + ("Context word " * 150)
+    assert ip._clean_rewrite(raw, "fix the bug") is None
+
+
+def test_clean_rewrite_accepts_compact_spec_near_contract() -> None:
+    raw = (
+        "Task: fix the bug.\n"
+        "Context: inspect the existing implementation and preserve the public API.\n"
+        "Acceptance criteria: tests cover the regression and the original behavior."
+    )
+    result = ip._clean_rewrite(raw, "fix the bug")
+    assert result is not None
+    assert len(result) <= 900
+    assert len(result.split()) <= 140

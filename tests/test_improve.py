@@ -3,11 +3,13 @@
 from __future__ import annotations
 
 import importlib.util
-import json
 import os
 import sys
 import tempfile
 from pathlib import Path
+from typing import Any, cast
+
+import pytest
 
 from tests import compat as ip
 
@@ -214,7 +216,7 @@ def test_cloud_cascade_postprocesses_output():
             "tier": "T2",
         }
 
-    stub.cheap_complete = fake_complete
+    cast(Any, stub).cheap_complete = fake_complete
     cfg.CLOUD_FALLBACK = True
     imod.CLOUD_FALLBACK = True
     old_compat = imod.compat.cheap_complete
@@ -244,27 +246,12 @@ def test_smoke_cloud_cascade_live():
     try:
         import cheap_llm  # type: ignore[import-not-found]  # noqa: F401
     except Exception:
-        try:
-            import pytest
-
-            pytest.skip("cheap_llm not importable")
-        except ImportError:
-            return
+        pytest.skip("cheap_llm not importable")
     if not os.environ.get("OPENROUTER_API_KEY"):
-        try:
-            import pytest
-
-            pytest.skip("no OPENROUTER_API_KEY")
-        except ImportError:
-            return
+        pytest.skip("no OPENROUTER_API_KEY")
     result = imod.call_cloud_cascade("fix the bug", "rewrite")
     if result is None:
-        try:
-            import pytest
-
-            pytest.skip("cloud cascade unavailable")
-        except ImportError:
-            return
+        pytest.skip("cloud cascade unavailable")
     text, src = result
     assert src.startswith("cloud:")
     assert "Contexto:" not in text
@@ -278,27 +265,12 @@ def test_role_model_map_exists():
     assert "prompt_clarify" in ip._ROLE_MODEL_MAP
 
 
-def test_role_model_map_prefers_refactor_winner():
-    """First candidate is the 2026-07-08 improve winner for both prompt roles.
-
-    Architecture verified via ollama's /api/show `details.family` rather than
-    the model NAME, because registry tags can vary.
-    """
-    import urllib.request
-
+def test_role_model_map_prefers_evidence_fidelity_winner():
+    """Both prompt roles start with the final risk-weighted improve winner."""
     for role in ("prompt_rewrite", "prompt_clarify"):
         candidates = ip._ROLE_MODEL_MAP[role]
         assert len(candidates) >= 2, f"{role} should have at least 2 candidates"
-        primary = candidates[0]
-        with urllib.request.urlopen(
-            "http://localhost:11434/api/show",
-            data=json.dumps({"name": primary}).encode(),
-            timeout=5,
-        ) as r:
-            family = json.load(r).get("details", {}).get("family", "")
-        assert family == "qwen35", (
-            f"{role} should prefer qwen35-arch first, got {primary} (family={family})"
-        )
+        assert candidates[0] == "cryptidbleh/gemma4-claude-opus-4.6:latest"
 
 
 def test_role_model_map_no_hauhaucs():
@@ -355,7 +327,7 @@ def test_choose_model_for_role_prefers_role_candidate():
     try:
         primary, fallbacks = omod.choose_ollama_model_for_role("prompt_rewrite")
         assert primary is not None
-        # OmniCoder is ahead of qwen3.5:4b in the role chain -> must win.
+        # OmniCoder remains ahead of the unranked available-model tail.
         assert "omnicoder" in primary.lower()
         assert len(fallbacks) >= 1
     finally:
@@ -388,12 +360,12 @@ def test_choose_model_for_role_env_override():
     import prompt_improve.shared.ollama as omod
 
     orig_env = os.environ.get("OLLAMA_IMPROVE_ROLE_PROMPT_REWRITE")
+    orig_map = cfg._ROLE_MODEL_MAP.copy()
     orig_models = omod.available_ollama_models
     omod.available_ollama_models = lambda: ["custom-model:latest", "qwen3.5:4b"]
     orig_start = omod.start_ollama_best_effort
     omod.start_ollama_best_effort = lambda: True
     try:
-        orig_map = cfg._ROLE_MODEL_MAP.copy()
         cfg._ROLE_MODEL_MAP["prompt_rewrite"] = ["custom-model:latest"]
         omod._ROLE_MODEL_MAP = cfg._ROLE_MODEL_MAP
         primary, fallbacks = omod.choose_ollama_model_for_role("prompt_rewrite")
@@ -445,7 +417,9 @@ def test_fallback_chain_continues_past_model_load_failure():
     """Primary raises OllamaRequestError (HTTP 500 / VRAM load failure) → the
     chain MUST advance to the fallback and succeed, not abort."""
     mod, calls, saved, ReqErr, _Unavail, fake_chat = _patch_runner()
-    fake_chat._next = _seq_responder([ReqErr("HTTP 500: unable to load model"), _FAKE_REWRITE])
+    cast(Any, fake_chat)._next = _seq_responder(
+        [ReqErr("HTTP 500: unable to load model"), _FAKE_REWRITE]
+    )
     try:
         result = mod.call_ollama_rewrite("haz el dashboard mas rapido", cwd=None)
     finally:
@@ -462,7 +436,7 @@ def test_fallback_chain_aborts_on_daemon_down():
     """OllamaUnavailable (daemon unreachable) → abort the whole chain; do NOT
     burn time trying further models against a down daemon."""
     mod, calls, saved, _ReqErr, Unavail, fake_chat = _patch_runner()
-    fake_chat._next = _seq_responder([Unavail("connection refused")])
+    cast(Any, fake_chat)._next = _seq_responder([Unavail("connection refused")])
     try:
         result = mod.call_ollama_rewrite("haz el dashboard mas rapido", cwd=None)
     finally:
@@ -476,8 +450,8 @@ def test_fallback_chain_skips_empty_then_succeeds():
     """A model that returns empty (think-leak / no content) is skipped via
     `if not content: continue` — distinct from a load failure."""
     mod, calls, saved, _ReqErr, _Unavail, fake_chat = _patch_runner()
-    fake_chat._next = _seq_responder(["", "   ", _FAKE_REWRITE])
-    mod.choose_ollama_model_for_role = lambda role: (
+    cast(Any, fake_chat)._next = _seq_responder(["", "   ", _FAKE_REWRITE])
+    cast(Any, mod).choose_ollama_model_for_role = lambda role: (
         "primary_model",
         ["second_model", "third_model"],
     )
@@ -489,6 +463,25 @@ def test_fallback_chain_skips_empty_then_succeeds():
     _, source = result
     assert source == "ollama:third_model", f"empty models should be skipped: {source}"
     assert calls == ["primary_model", "second_model", "third_model"]
+
+
+def test_fallback_chain_respects_total_latency_budget():
+    """A slow primary must not grant every fallback another full timeout."""
+    mod, calls, saved, ReqErr, _Unavail, fake_chat = _patch_runner()
+    cast(Any, fake_chat)._next = _seq_responder([ReqErr("primary timed out")])
+    old_monotonic = mod.monotonic
+    old_budget = mod.OLLAMA_TOTAL_TIMEOUT
+    timestamps = iter((100.0, 100.0, 125.0))
+    cast(Any, mod).monotonic = lambda: next(timestamps)
+    cast(Any, mod).OLLAMA_TOTAL_TIMEOUT = 24.0
+    try:
+        result = mod.call_ollama_rewrite("haz el dashboard mas rapido", cwd=None)
+    finally:
+        cast(Any, mod).monotonic = old_monotonic
+        cast(Any, mod).OLLAMA_TOTAL_TIMEOUT = old_budget
+        _restore(mod, saved)
+    assert result is None
+    assert calls == ["primary_model"]
 
 
 def test_cloud_cascade_does_not_swallow_programmer_errors():
@@ -527,13 +520,14 @@ def test_build_messages_clarify_includes_do_verify():
     assert "DO or VERIFY" in user
 
 
-def test_build_messages_use_codex_real_tooling_not_lsp():
+def test_build_messages_keep_tooling_neutral_to_avoid_prompt_bias():
     import prompt_improve.features.improve as m
 
     system, _ = m._build_messages("rewrite", "refactor this function safely", None)
-    assert "codeq" in system
-    assert "codescan" in system
+    assert "codeq" not in system
+    assert "codescan" not in system
     assert "LSP" not in system
+    assert "immutable evidence" in system
 
 
 def test_ollama_url_is_loopback_only():
@@ -553,7 +547,7 @@ def test_build_messages_includes_project_hint_when_continuation():
         mb.mkdir()
         (mb / "currentTask.md").write_text("- Active: test task\n", encoding="utf-8")
         _, user = m._build_messages("rewrite", "continua", d)
-        assert "Project context:" in user
+        assert "Execution context (not task scope):" in user
         assert "test task" in user
 
 
@@ -561,4 +555,4 @@ def test_build_messages_omits_hint_when_no_cwd():
     import prompt_improve.features.improve as m
 
     _, user = m._build_messages("rewrite", "fix it", None)
-    assert "Project context:" not in user
+    assert "Execution context (not task scope):" not in user

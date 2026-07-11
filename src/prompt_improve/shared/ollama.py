@@ -23,7 +23,8 @@ from prompt_improve.shared.config import (
 def _get_json(path: str, timeout: float) -> dict | None:
     try:
         # OLLAMA_URL is normalized to http loopback in shared.config.
-        with urlopen(f"{OLLAMA_URL.rstrip('/')}{path}", timeout=timeout) as response:  # nosemgrep: python.lang.security.audit.dynamic-urllib-use-detected.dynamic-urllib-use-detected
+        url = f"{OLLAMA_URL.rstrip('/')}{path}"
+        with urlopen(url, timeout=timeout) as response:  # nosemgrep
             return json.loads(response.read().decode("utf-8"))
     except (HTTPError, URLError, TimeoutError, OSError, ValueError, json.JSONDecodeError):
         return None
@@ -92,20 +93,17 @@ def start_ollama_best_effort() -> bool:
     return False
 
 
-
-
-
 def _normalize_model_name(name: str) -> str:
     # remove registry prefixes/usernames (e.g. hf.co/kai-os/Grug-12B-GGUF -> Grug-12B-GGUF)
-    name = re.sub(r'^(?:[^/]+/){1,2}', '', name)
+    name = re.sub(r"^(?:[^/]+/){1,2}", "", name)
     # remove tags
-    if ':' in name:
-        name = name.split(':')[0]
+    if ":" in name:
+        name = name.split(":")[0]
     # remove host/quantization hints that vary by local install tag
-    name = re.sub(r'_Q\d+K_\d+GB-GPU$', '', name, flags=re.I)
-    name = re.sub(r'_Q\d+_\d+k_\d+GB-GPU$', '', name, flags=re.I)
-    name = re.sub(r'_(?:UD_)?Q\d(?:_[A-Z0-9]+)*$', '', name, flags=re.I)
-    return name.lower().replace('-', '').replace('_', '').replace('.', '')
+    name = re.sub(r"_Q\d+K_\d+GB-GPU$", "", name, flags=re.I)
+    name = re.sub(r"_Q\d+_\d+k_\d+GB-GPU$", "", name, flags=re.I)
+    name = re.sub(r"_(?:UD_)?Q\d(?:_[A-Z0-9]+)*$", "", name, flags=re.I)
+    return name.lower().replace("-", "").replace("_", "").replace(".", "")
 
 
 def choose_ollama_model_for_role(role: str) -> tuple[str | None, list[str]]:
@@ -152,7 +150,9 @@ def choose_ollama_model_for_role(role: str) -> tuple[str | None, list[str]]:
             all_ordered.append(match)
             seen.add(match)
 
-    for model in available:
+    # Sorted so the leftover tail is deterministic — ``available`` is a set,
+    # and set-iteration order would otherwise vary between hook invocations.
+    for model in sorted(available):
         if model not in seen:
             all_ordered.append(model)
             seen.add(model)

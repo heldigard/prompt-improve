@@ -7,6 +7,8 @@ import json
 import sys
 from pathlib import Path
 
+import pytest
+
 from tests import compat as ip
 
 EVALS = Path(__file__).resolve().parent.parent / "evals" / "prompt-improve.json"
@@ -46,8 +48,6 @@ def test_smoke_rewrite_no_es_leak_no_question_loop():
     import prompt_improve.shared.cache as cache_mod
 
     if not _ollama_available():
-        import pytest
-
         pytest.skip("ollama not available")
     orig_ttl = cache_mod.CACHE_TTL_SECONDS
     cache_mod.CACHE_TTL_SECONDS = 0.0
@@ -56,8 +56,6 @@ def test_smoke_rewrite_no_es_leak_no_question_loop():
     finally:
         cache_mod.CACHE_TTL_SECONDS = orig_ttl
     if result is None:
-        import pytest
-
         pytest.skip("ollama returned no output")
     text = result[0]
     assert "Contexto:" not in text and "Objetivo:" not in text

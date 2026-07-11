@@ -4,29 +4,28 @@ from __future__ import annotations
 
 import re
 
+from prompt_improve.features.detect import detect_language
 from prompt_improve.features.target import GENERIC_TARGET, TargetProfile, target_guidance
 
 SYSTEM_PROMPT = (
     "You are a prompt-clarity assistant for an AUTONOMOUS coding agent — not a human.\n"
-    "The agent HAS tools: grep/rg, ast-grep, codeq (symbol lookup/context), "
-    "codescan (quality sensors), file read/edit, tests, and web search. "
-    "It can discover files, call sites, docs, and quality findings itself.\n"
+    "The agent can inspect local evidence and execute the work itself.\n"
     "Return 1-3 concise bullets that help the agent act MORE effectively. Each bullet "
     "must tell the agent what to DO or VERIFY (an action it can take), NOT what to ask "
     "the user for. Only request user input for genuinely undiscoverable facts "
     "(credentials, business preference, or bug-reproduction steps absent from context).\n"
     "Maintain the user's language. Do not rewrite the full prompt. Do not invent "
     "tools, frameworks, files, standards, or requirements the user did not imply. "
-    "Prefer action categories unless the local ecosystem tool matters (codeq for "
-    "symbol facts, codescan for quality sensors, run a test). "
+    "Preserve every project name, path, model identifier, and stated relationship "
+    "as evidence. Do not reinterpret a project name as a language or tool. "
     "Do not mention that you are an AI.\n"
     "Agent-oriented heuristics:\n"
     "- Bug-fix without evidence: the agent should grep for the reported symptom and "
     "ask for the error text only if it is absent from the prompt AND undiscoverable.\n"
-    "- Refactor/analysis: the agent should resolve call sites with codeq refs/context "
-    "BEFORE editing, then re-run focused tests after.\n"
-    "- Quality/security review: the agent should use the narrowest useful codescan "
-    "sensor before broad scans.\n"
+    "- Refactor/analysis: the agent should inspect definitions and call sites before "
+    "editing, then run focused verification after.\n"
+    "- Research/documentation: verify claims against the named source of truth; do "
+    "not turn it into an implementation task or generic quality scan.\n"
     "- Create without criteria: the agent should confirm success via a runnable test.\n"
     "- Long (>400 chars) without labeled sections: suggest flat sections "
     "(Task / Context / Source / Constraints / Output).\n"
@@ -53,7 +52,7 @@ def build_rewrite_system_prompt(
         )
         agent_note = (
             "Si la intención es genuinamente ambigua, añade una línea 'Nota para el "
-            "agente:' indicando qué localizar con rg/codeq antes de actuar."
+            "agente:' indicando qué evidencia local debe verificar antes de actuar."
         )
         absolutes = "objetivos numéricos absolutos (ej. '100% cobertura', 'cero downtime')"
     else:
@@ -65,13 +64,12 @@ def build_rewrite_system_prompt(
             "Acceptance criteria",
         )
         agent_note = (
-            "If intent is genuinely ambiguous, add an 'Agent note:' line stating what "
-            "to locate via rg/codeq before acting."
+            "If intent is genuinely ambiguous, add an 'Agent note:' line stating "
+            "which local evidence must be verified before acting."
         )
         absolutes = "absolute numeric targets (e.g. '100% coverage', 'zero downtime')"
     return (
-        "You are a prompt-engineering assistant for an AUTONOMOUS coding agent "
-        "(the agent has tools: rg/grep, ast-grep, codeq, codescan, file edit, tests, web search). "
+        "You are a prompt-engineering assistant for an AUTONOMOUS coding agent. "
         "The user wrote a SHORT, vague prompt. Rewrite it into a clear, actionable, "
         "structured prompt that captures their evident intent without inventing "
         "requirements they did not imply.\n"
@@ -81,6 +79,11 @@ def build_rewrite_system_prompt(
         "meta-commentary, no 'Here is...'.\n"
         "- Do NOT invent technologies, frameworks, libraries, file paths, or standards "
         "the user did not mention or clearly imply.\n"
+        "- Treat the user's project names, paths, model identifiers, and stated "
+        "relationships as immutable evidence. Never reinterpret a project as a "
+        "programming language, tool, or owner.\n"
+        "- A likely typo may be corrected only when Execution context explicitly names "
+        "a verified existing candidate; otherwise preserve it and ask the agent to verify.\n"
         f"- Do NOT invent {absolutes}.\n"
         "- Do NOT end with questions for the user; the agent discovers via tools.\n"
         "- Do NOT mention that you are an AI.\n"
@@ -89,7 +92,8 @@ def build_rewrite_system_prompt(
         f"- {ctx}: brief inferred situation (only if inferable).\n"
         f"- {obj}: what to achieve.\n"
         f"- {constr}: boundaries (only if inferable).\n"
-        f"- {accept}: a runnable check (only if inferable).\n"
+        f"- {accept}: task-appropriate evidence (source comparison for research/docs; "
+        "a runnable check for code changes), only if inferable.\n"
         f"{target_guidance(target, 'rewrite', language)}\n"
         "- Keep it concise (max ~140 words).\n"
         f"- {agent_note}\n"
@@ -119,18 +123,62 @@ def _task_before_fenced_code(prompt: str) -> bool:
     )
 
 
+# (spanish, english) pairs so the fallback answers in the user's language —
+# previously every suggestion shipped in Spanish under an English header.
+_SUGGESTIONS = {
+    "delegation_scope": (
+        "Define el alcance, el formato de salida esperado y los criterios de éxito para el skill/agente/swarm.",
+        "Define the scope, expected output format, and success criteria for the skill/agent/swarm.",
+    ),
+    "memory_target": (
+        "Especifica el proyecto/tema y qué tipo de memoria debe actualizarse (decisión, progreso, contexto activo).",
+        "Specify the project/topic and which memory type to update (decision, progress, active context).",
+    ),
+    "fix_target": (
+        "Especifica el archivo, función o línea afectada.",
+        "Specify the affected file, function, or line.",
+    ),
+    "error_handling": (
+        "Considera mencionar manejo de errores o validaciones.",
+        "Consider mentioning error handling or validations.",
+    ),
+    "compatibility": (
+        "Indica si debe mantener compatibilidad o puede romper cambios.",
+        "State whether it must stay backward compatible or may break changes.",
+    ),
+    "number_steps": (
+        "Considera numerar los pasos para mayor claridad.",
+        "Consider numbering the steps for clarity.",
+    ),
+    "error_text": (
+        "Incluye el mensaje de error o traceback si lo tienes.",
+        "Include the error message or traceback if you have it.",
+    ),
+    "flat_sections": (
+        "Estructura con secciones planas: Task / Context / Source / Constraints / Output format.",
+        "Structure with flat sections: Task / Context / Source / Constraints / Output format.",
+    ),
+    "missing_source": (
+        "Define qué debe responder el agente si la fuente de verdad no está disponible.",
+        "Define what the agent should answer if the source of truth is unavailable.",
+    ),
+    "task_after_source": (
+        "Coloca la tarea DESPUÉS del material fuente para mejor calidad de respuesta.",
+        "Place the task AFTER the source material for better response quality.",
+    ),
+}
+
+
 def rule_based_suggestions(prompt: str) -> str | None:
     """Static heuristic suggestions as last-resort fallback."""
     p = prompt.lower()
-    suggestions = []
+    keys: list[str] = []
 
     if re.search(r"\b(skill|agente|subagent|swarm|busca|search|investiga|audit|revisa toda)\b", p):
         if not re.search(
             r"\b(scope|alcance|criterio|formato de salida|output format|presupuesto|budget)\b", p
         ):
-            suggestions.append(
-                "Define el alcance, el formato de salida esperado y los criterios de éxito para el skill/agente/swarm."
-            )
+            keys.append("delegation_scope")
 
     if re.search(
         r"\b(memory bank|memoria|recuerda|\.memory-bank|activeContext|systemPatterns)\b", p
@@ -138,31 +186,29 @@ def rule_based_suggestions(prompt: str) -> str | None:
         if not re.search(
             r"\b(project|proyecto|topic|tema|decisión|decision|progreso|progress)\b", p
         ):
-            suggestions.append(
-                "Especifica el proyecto/tema y qué tipo de memoria debe actualizarse (decisión, progreso, contexto activo)."
-            )
+            keys.append("memory_target")
 
     if re.search(r"\b(fix|arregla|debug|solve|resuelve|help|check)\b", p):
         has_target = re.search(r"\b(file|archivo|function|función|class|line|línea|error|bug)\b", p)
         has_path = "/" in prompt or "\\" in prompt
         if not has_target and not has_path:
-            suggestions.append("Especifica el archivo, función o línea afectada.")
+            keys.append("fix_target")
 
     if re.search(r"\b(create|crear|build|implement|add|genera)\b", p):
         if not any(w in p for w in ["test", "prueba", "error handling", "validación"]):
-            suggestions.append("Considera mencionar manejo de errores o validaciones.")
+            keys.append("error_handling")
 
     if re.search(r"\b(refactor|optimiz|improv|mejor|clean)\b", p):
         if not any(w in p for w in ["compat", "break", "test"]):
-            suggestions.append("Indica si debe mantener compatibilidad o puede romper cambios.")
+            keys.append("compatibility")
 
     connectors = len(re.findall(r"\b(and|then|also|after|before|después|luego|también)\b", p))
     if connectors >= 2 and "\n" not in prompt:
-        suggestions.append("Considera numerar los pasos para mayor claridad.")
+        keys.append("number_steps")
 
     if re.search(r"\b(bug|error|fail|crash|no funciona)\b", p):
         if not any(w in p for w in ["traceback", "log", "mensaje", "stack", "línea"]):
-            suggestions.append("Incluye el mensaje de error o traceback si lo tienes.")
+            keys.append("error_text")
 
     if len(prompt) > 400 and "\n" in prompt:
         if not re.search(
@@ -170,27 +216,23 @@ def rule_based_suggestions(prompt: str) -> str | None:
             prompt,
             re.IGNORECASE | re.MULTILINE,
         ):
-            suggestions.append(
-                "Estructura con secciones planas: Task / Context / Source / Constraints / Output format."
-            )
+            keys.append("flat_sections")
 
     if re.search(r"\b(refactor|analyze|analyz|review|revisar|audit)\b", p):
         if not re.search(r"\b(if (unknown|missing)|si (falta|desconocido)|no aplica)\b", p):
-            suggestions.append(
-                "Define qué debe responder el agente si la fuente de verdad no está disponible."
-            )
+            keys.append("missing_source")
 
     if _task_before_fenced_code(prompt):
-        suggestions.append(
-            "Coloca la tarea DESPUÉS del material fuente para mejor calidad de respuesta."
-        )
+        keys.append("task_after_source")
 
-    if not suggestions:
+    if not keys:
         return None
 
+    spanish = detect_language(prompt) == "Spanish"
     header = (
         "Sugerencias para clarificar el prompt:"
-        if "á" in prompt or "é" in prompt or re.search(r"\b(el|la|los|las|es|son)\b", p)
+        if spanish
         else "Suggestions to clarify the prompt:"
     )
+    suggestions = [_SUGGESTIONS[key][0 if spanish else 1] for key in keys]
     return header + "\n- " + "\n- ".join(suggestions)
