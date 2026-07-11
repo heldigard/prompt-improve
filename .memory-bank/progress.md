@@ -1,5 +1,7 @@
 # Progress
 
+- 2026-07-11T20:12:00Z | status:completed | Cierre de sesión: se registró limpieza de ruido en memoria y estado de trabajo pendiente de push de hoy en repos asociados.
+
 ## 2026-07-05 (target-aware prompt profiles)
 - Verified current implementation against the CLI ecosystem: Claude Code shell functions in `.zshrc`, Codex external profiles (`gpt-5.4-mini`, `gpt-5.4`, `gpt-5.5`), and Antigravity/Gemini long-context bridge.
 - Confirmed target-aware routing exists in `features/target.py`: Claude -> XML tags, Codex/OpenAI GPT -> Markdown workflow/verification, Gemini/Antigravity -> component blocks, proxy models -> literal explicit steps.
@@ -65,3 +67,4 @@
 - 2026-07-11T18:51:20Z | status:completed | detect_language fix: markers español con word boundaries (request/query/unique/sequence ya no fuerzan Spanish); CI ahora corre ruff format --check; CLAUDE.md layout alineado con archivos planos + target/. Commits eac7f32, 358fcdb
 - 2026-07-11T18:51:38Z | status:completed | session:5ed0a899-93cb-4ef3-9433-a175a21ded92 | claude: None.
 - 2026-07-11T19:00:22Z | status:completed | Ronda 2 mejoras: cache con prune de expirados + write atómico (281/283 stale eliminados de raíz), rule_based_suggestions localizado EN/ES, orden determinista de cadena de modelos (commits 304a58f, 90b519b). Smoke e2e del hook OK vía shim
+- 2026-07-11T19:19:29Z | status:completed | Reconcile 2026-07-11: branches auxiliares feat/ollama-client-require-gate mergeadas a main en los 3 proyectos (ollama-client ya estaba). 14/12/2 commits ahead of origin/main respectivamente. Estado limpio: sin stashes, worktrees sueltos, ni ramas locales. Sin push (avísame si quieres). Commits relevantes: 4434ede (prompt-improve merge), af4e9c3 (smart-trim merge), 586e65a (ollama-client docs). Tests verdes excluyendo 2 tests environment-dependent en prompt-improve (test_target_profile_detects_claude_*: solo fallan si ANTHROPIC_MODEL está poblado y CLAUDECODE=1; son pre-existentes del autor del repo, no regresión de mi merge)

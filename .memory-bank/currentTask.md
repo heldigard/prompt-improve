@@ -1,12 +1,14 @@
 # Current Task
 
-> Updated: 2026-07-09
+> Updated: 2026-07-11
 
 ## Goal
 - None.
 
 ## Status
 - No active implementation guide. Completed work is in progress.md.
+
+- [x] 2026-07-11: memoria de cierre de sesión y handoff actualizada.
 
 ## Status — carried over (stable)
 - [x] Shell wrappers `ec53`/`ec54` export `PROMPT_IMPROVE_TARGET_*` explicitly before calling `enhance`
