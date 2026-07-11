@@ -81,6 +81,18 @@ def test_detect_language_matches_unaccented_spanish_markers():
     assert ip.detect_language("what do you want to do") == "English"
 
 
+def test_detect_language_ignores_spanish_substrings_inside_english_words():
+    # Bug fix 2026-07-11: substring matching flagged English words containing
+    # "que" (request/query/unique/sequence) as Spanish, so the rewrite came
+    # back in the wrong language. Markers now require word boundaries.
+    assert ip.detect_language("improve the request queue") == "English"
+    assert ip.detect_language("fix the query builder") == "English"
+    assert ip.detect_language("unique constraint fails on insert") == "English"
+    assert ip.detect_language("run the test sequence again") == "English"
+    # Standalone Spanish function words still match.
+    assert ip.detect_language("como se usa esto") == "Spanish"
+
+
 def test_has_concrete_target_true():
     assert ip.has_concrete_target("fix the bug in src/auth/login.py")
     assert ip.has_concrete_target("update the config.yaml timeouts")

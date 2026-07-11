@@ -21,35 +21,20 @@ _CONVERSATION_CONTEXT_RE = re.compile(
 )
 
 
+# Markers ship in BOTH accented and unaccented forms: a user typing "que quieres"
+# or "configuracion" (no accent) would be missed if we only listed "qué" /
+# "configuración". Word boundaries are mandatory: substring matching classified
+# English prompts containing request/query/unique/sequence ("que") as Spanish.
+_SPANISH_MARKER_RE = re.compile(
+    r"\b(?:arregla|revisa|corrige|continua|implementa|mejora|mejorar|prueba|pruebas|"
+    r"casos|funcione|archivo|configuracion|configuración|seguridad|que|qué|como|cómo)\b",
+    re.IGNORECASE,
+)
+
+
 def detect_language(prompt: str) -> str:
     """Heuristic Spanish/English detector. Both accented and unaccented markers match."""
-    p = prompt.lower()
-    # Markers ship in BOTH accented and unaccented forms: lower() preserves accents,
-    # so a user typing "que quieres" or "configuracion" (no accent) would be
-    # missed if we only listed "qué" / "configuración". Listing both is simpler
-    # than running unicodedata on every input.
-    spanish_markers = (
-        "arregla",
-        "revisa",
-        "corrige",
-        "continua",
-        "implementa",
-        "mejora",
-        "mejorar",
-        "prueba",
-        "pruebas",
-        "casos",
-        "funcione",
-        "archivo",
-        "configuracion",
-        "configuración",
-        "seguridad",
-        "que",
-        "qué",
-        "como",
-        "cómo",
-    )
-    if any(marker in p for marker in spanish_markers) or re.search(r"[áéíóúñ¿¡]", p):
+    if _SPANISH_MARKER_RE.search(prompt) or re.search(r"[áéíóúñ¿¡]", prompt):
         return "Spanish"
     return "English"
 
