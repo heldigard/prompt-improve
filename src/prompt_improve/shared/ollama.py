@@ -150,7 +150,9 @@ def choose_ollama_model_for_role(role: str) -> tuple[str | None, list[str]]:
             all_ordered.append(match)
             seen.add(match)
 
-    for model in available:
+    # Sorted so the leftover tail is deterministic — ``available`` is a set,
+    # and set-iteration order would otherwise vary between hook invocations.
+    for model in sorted(available):
         if model not in seen:
             all_ordered.append(model)
             seen.add(model)
