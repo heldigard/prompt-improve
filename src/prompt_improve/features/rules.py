@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import re
 
+from prompt_improve.features.detect import detect_language
 from prompt_improve.features.target import GENERIC_TARGET, TargetProfile, target_guidance
 
 SYSTEM_PROMPT = (
@@ -122,18 +123,62 @@ def _task_before_fenced_code(prompt: str) -> bool:
     )
 
 
+# (spanish, english) pairs so the fallback answers in the user's language —
+# previously every suggestion shipped in Spanish under an English header.
+_SUGGESTIONS = {
+    "delegation_scope": (
+        "Define el alcance, el formato de salida esperado y los criterios de éxito para el skill/agente/swarm.",
+        "Define the scope, expected output format, and success criteria for the skill/agent/swarm.",
+    ),
+    "memory_target": (
+        "Especifica el proyecto/tema y qué tipo de memoria debe actualizarse (decisión, progreso, contexto activo).",
+        "Specify the project/topic and which memory type to update (decision, progress, active context).",
+    ),
+    "fix_target": (
+        "Especifica el archivo, función o línea afectada.",
+        "Specify the affected file, function, or line.",
+    ),
+    "error_handling": (
+        "Considera mencionar manejo de errores o validaciones.",
+        "Consider mentioning error handling or validations.",
+    ),
+    "compatibility": (
+        "Indica si debe mantener compatibilidad o puede romper cambios.",
+        "State whether it must stay backward compatible or may break changes.",
+    ),
+    "number_steps": (
+        "Considera numerar los pasos para mayor claridad.",
+        "Consider numbering the steps for clarity.",
+    ),
+    "error_text": (
+        "Incluye el mensaje de error o traceback si lo tienes.",
+        "Include the error message or traceback if you have it.",
+    ),
+    "flat_sections": (
+        "Estructura con secciones planas: Task / Context / Source / Constraints / Output format.",
+        "Structure with flat sections: Task / Context / Source / Constraints / Output format.",
+    ),
+    "missing_source": (
+        "Define qué debe responder el agente si la fuente de verdad no está disponible.",
+        "Define what the agent should answer if the source of truth is unavailable.",
+    ),
+    "task_after_source": (
+        "Coloca la tarea DESPUÉS del material fuente para mejor calidad de respuesta.",
+        "Place the task AFTER the source material for better response quality.",
+    ),
+}
+
+
 def rule_based_suggestions(prompt: str) -> str | None:
     """Static heuristic suggestions as last-resort fallback."""
     p = prompt.lower()
-    suggestions = []
+    keys: list[str] = []
 
     if re.search(r"\b(skill|agente|subagent|swarm|busca|search|investiga|audit|revisa toda)\b", p):
         if not re.search(
             r"\b(scope|alcance|criterio|formato de salida|output format|presupuesto|budget)\b", p
         ):
-            suggestions.append(
-                "Define el alcance, el formato de salida esperado y los criterios de éxito para el skill/agente/swarm."
-            )
+            keys.append("delegation_scope")
 
     if re.search(
         r"\b(memory bank|memoria|recuerda|\.memory-bank|activeContext|systemPatterns)\b", p
@@ -141,31 +186,29 @@ def rule_based_suggestions(prompt: str) -> str | None:
         if not re.search(
             r"\b(project|proyecto|topic|tema|decisión|decision|progreso|progress)\b", p
         ):
-            suggestions.append(
-                "Especifica el proyecto/tema y qué tipo de memoria debe actualizarse (decisión, progreso, contexto activo)."
-            )
+            keys.append("memory_target")
 
     if re.search(r"\b(fix|arregla|debug|solve|resuelve|help|check)\b", p):
         has_target = re.search(r"\b(file|archivo|function|función|class|line|línea|error|bug)\b", p)
         has_path = "/" in prompt or "\\" in prompt
         if not has_target and not has_path:
-            suggestions.append("Especifica el archivo, función o línea afectada.")
+            keys.append("fix_target")
 
     if re.search(r"\b(create|crear|build|implement|add|genera)\b", p):
         if not any(w in p for w in ["test", "prueba", "error handling", "validación"]):
-            suggestions.append("Considera mencionar manejo de errores o validaciones.")
+            keys.append("error_handling")
 
     if re.search(r"\b(refactor|optimiz|improv|mejor|clean)\b", p):
         if not any(w in p for w in ["compat", "break", "test"]):
-            suggestions.append("Indica si debe mantener compatibilidad o puede romper cambios.")
+            keys.append("compatibility")
 
     connectors = len(re.findall(r"\b(and|then|also|after|before|después|luego|también)\b", p))
     if connectors >= 2 and "\n" not in prompt:
-        suggestions.append("Considera numerar los pasos para mayor claridad.")
+        keys.append("number_steps")
 
     if re.search(r"\b(bug|error|fail|crash|no funciona)\b", p):
         if not any(w in p for w in ["traceback", "log", "mensaje", "stack", "línea"]):
-            suggestions.append("Incluye el mensaje de error o traceback si lo tienes.")
+            keys.append("error_text")
 
     if len(prompt) > 400 and "\n" in prompt:
         if not re.search(
@@ -173,27 +216,23 @@ def rule_based_suggestions(prompt: str) -> str | None:
             prompt,
             re.IGNORECASE | re.MULTILINE,
         ):
-            suggestions.append(
-                "Estructura con secciones planas: Task / Context / Source / Constraints / Output format."
-            )
+            keys.append("flat_sections")
 
     if re.search(r"\b(refactor|analyze|analyz|review|revisar|audit)\b", p):
         if not re.search(r"\b(if (unknown|missing)|si (falta|desconocido)|no aplica)\b", p):
-            suggestions.append(
-                "Define qué debe responder el agente si la fuente de verdad no está disponible."
-            )
+            keys.append("missing_source")
 
     if _task_before_fenced_code(prompt):
-        suggestions.append(
-            "Coloca la tarea DESPUÉS del material fuente para mejor calidad de respuesta."
-        )
+        keys.append("task_after_source")
 
-    if not suggestions:
+    if not keys:
         return None
 
+    spanish = detect_language(prompt) == "Spanish"
     header = (
         "Sugerencias para clarificar el prompt:"
-        if "á" in prompt or "é" in prompt or re.search(r"\b(el|la|los|las|es|son)\b", p)
+        if spanish
         else "Suggestions to clarify the prompt:"
     )
+    suggestions = [_SUGGESTIONS[key][0 if spanish else 1] for key in keys]
     return header + "\n- " + "\n- ".join(suggestions)

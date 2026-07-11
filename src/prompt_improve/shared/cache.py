@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import hashlib
 import json
+import os
+import tempfile
 import time
 from pathlib import Path
 
@@ -97,9 +99,41 @@ def save_cached(prompt: str, mode: str, text: str, source: str, cwd: str | None 
     path = _cache_path(_cache_key(prompt, mode, cwd))
     try:
         path.parent.mkdir(parents=True, exist_ok=True)
-        path.write_text(
-            json.dumps({"text": text, "source": source}, ensure_ascii=False),
-            encoding="utf-8",
-        )
+        # Atomic write: a concurrent hook reading a half-written entry would
+        # get JSONDecodeError and silently skip a valid cache hit.
+        fd, tmp_name = tempfile.mkstemp(dir=path.parent, suffix=".tmp")
+        try:
+            with os.fdopen(fd, "w", encoding="utf-8") as handle:
+                handle.write(json.dumps({"text": text, "source": source}, ensure_ascii=False))
+            os.replace(tmp_name, path)
+        except OSError:
+            Path(tmp_name).unlink(missing_ok=True)
+            raise
     except OSError:
-        pass
+        return
+    prune_expired()
+
+
+def prune_expired(max_unlinks: int = 200) -> int:
+    """Drop expired entries left behind by load's read-time-only eviction.
+
+    Entries that are never read again would otherwise accumulate forever
+    (observed: 281/283 files expired on disk). Called after each save; the
+    unlink cap bounds worst-case latency on a huge backlog.
+    """
+    removed = 0
+    cutoff = time.time() - CACHE_TTL_SECONDS
+    try:
+        entries = list(CACHE_DIR.glob("*.json")) + list(CACHE_DIR.glob("*.tmp"))
+    except OSError:
+        return 0
+    for entry in entries:
+        try:
+            if entry.stat().st_mtime < cutoff:
+                entry.unlink(missing_ok=True)
+                removed += 1
+        except OSError:
+            continue
+        if removed >= max_unlinks:
+            break
+    return removed

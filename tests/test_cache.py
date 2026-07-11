@@ -69,3 +69,49 @@ def test_cache_ttl_zero_disables_save():
         cmod.save_cached("test", "rewrite", "improved", "test")
     finally:
         cmod.CACHE_TTL_SECONDS = orig
+
+
+def test_save_cached_is_atomic_and_prunes_expired(monkeypatch, tmp_path):
+    import time as _time
+
+    import prompt_improve.shared.cache as cmod
+
+    monkeypatch.setattr(cmod, "CACHE_DIR", tmp_path)
+    monkeypatch.setattr(cmod, "CACHE_TTL_SECONDS", 300.0)
+
+    expired = tmp_path / "old.json"
+    expired.write_text("{}", encoding="utf-8")
+    old = _time.time() - 301
+    os.utime(expired, (old, old))
+    stale_tmp = tmp_path / "tmpabc.tmp"
+    stale_tmp.write_text("partial", encoding="utf-8")
+    os.utime(stale_tmp, (old, old))
+
+    cmod.save_cached("some prompt", "rewrite", "improved text", "ollama:x")
+
+    assert not expired.exists(), "expired entry must be pruned on save"
+    assert not stale_tmp.exists(), "stale tmp leftovers must be pruned on save"
+    assert cmod.load_cached("some prompt", "rewrite") == ("improved text", "ollama:x")
+    # No half-written tmp files remain after a successful save.
+    assert list(tmp_path.glob("*.tmp")) == []
+
+
+def test_prune_expired_keeps_fresh_entries(monkeypatch, tmp_path):
+    import time as _time
+
+    import prompt_improve.shared.cache as cmod
+
+    monkeypatch.setattr(cmod, "CACHE_DIR", tmp_path)
+    monkeypatch.setattr(cmod, "CACHE_TTL_SECONDS", 300.0)
+
+    fresh = tmp_path / "fresh.json"
+    fresh.write_text("{}", encoding="utf-8")
+    expired = tmp_path / "expired.json"
+    expired.write_text("{}", encoding="utf-8")
+    old = _time.time() - 400
+    os.utime(expired, (old, old))
+
+    removed = cmod.prune_expired()
+    assert removed == 1
+    assert fresh.exists()
+    assert not expired.exists()

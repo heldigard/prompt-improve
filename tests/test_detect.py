@@ -116,3 +116,17 @@ def test_depends_on_conversation_context():
     assert ip.depends_on_conversation_context("implement what we discussed")
     assert ip.depends_on_conversation_context("como dijimos, corrige eso")
     assert not ip.depends_on_conversation_context("corrige el parser en src/config.py")
+
+
+def test_rule_based_suggestions_localized_to_prompt_language():
+    from prompt_improve.features.rules import rule_based_suggestions
+
+    en = rule_based_suggestions("please fix it now, something broken somewhere")
+    assert en is not None
+    assert en.startswith("Suggestions to clarify the prompt:")
+    assert "Especifica" not in en
+
+    es = rule_based_suggestions("arregla eso que está roto por favor")
+    assert es is not None
+    assert es.startswith("Sugerencias para clarificar el prompt:")
+    assert "Specify" not in es
