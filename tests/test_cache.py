@@ -59,16 +59,18 @@ def test_cache_ttl_zero_disables_load():
         cmod.CACHE_TTL_SECONDS = orig
 
 
-def test_cache_ttl_zero_disables_save():
+def test_cache_non_positive_ttl_disables_save_without_pruning(monkeypatch, tmp_path):
     import prompt_improve.shared.cache as cmod
 
-    orig = cmod.CACHE_TTL_SECONDS
-    cmod.CACHE_TTL_SECONDS = 0.0
-    try:
-        # Should not raise even with TTL=0
+    existing = tmp_path / "existing.json"
+    existing.write_text("{}", encoding="utf-8")
+    monkeypatch.setattr(cmod, "CACHE_DIR", tmp_path)
+
+    for ttl in (0.0, -1.0):
+        monkeypatch.setattr(cmod, "CACHE_TTL_SECONDS", ttl)
         cmod.save_cached("test", "rewrite", "improved", "test")
-    finally:
-        cmod.CACHE_TTL_SECONDS = orig
+
+    assert list(tmp_path.iterdir()) == [existing]
 
 
 def test_save_cached_is_atomic_and_prunes_expired(monkeypatch, tmp_path):

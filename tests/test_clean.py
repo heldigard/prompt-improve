@@ -93,7 +93,9 @@ def test_clean_rewrite_rejects_invented_go_project():
     assert ip._clean_rewrite(raw, "review the service") is None
 
 
-def test_clean_rewrite_allows_verified_close_path_correction():
+def test_clean_rewrite_allows_verified_close_path_correction(monkeypatch, tmp_path):
+    monkeypatch.setenv("HOME", str(tmp_path))
+    (tmp_path / "ollama-bench").mkdir()
     raw = "Review `~/ollama-bench/` and identify the role-specific winner."
     original = "review ~/ollama-bech/ and identify the winner"
     assert ip._clean_rewrite(raw, original) is not None

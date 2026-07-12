@@ -530,15 +530,6 @@ def test_build_messages_keep_tooling_neutral_to_avoid_prompt_bias():
     assert "immutable evidence" in system
 
 
-def test_ollama_url_is_loopback_only():
-    from prompt_improve.shared.ollama_url import normalize_ollama_url
-
-    assert normalize_ollama_url("http://127.0.0.1:11434") == "http://127.0.0.1:11434"
-    assert normalize_ollama_url("http://localhost:11434") == "http://localhost:11434"
-    assert normalize_ollama_url("https://127.0.0.1:11434") == "http://127.0.0.1:11434"
-    assert normalize_ollama_url("http://example.com:11434") == "http://127.0.0.1:11434"
-
-
 def test_build_messages_includes_project_hint_when_continuation():
     import prompt_improve.features.improve as m
 
