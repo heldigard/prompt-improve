@@ -56,16 +56,19 @@ OLLAMA_PID = os.path.expanduser("~/.ollama/ollama-serve.pid")
 # ---------------------------------------------------------------------------
 # Model candidates (global fallback)
 # ---------------------------------------------------------------------------
-# Default chain = 2026-07-09 evidence-fidelity re-bench. Cryptid leads the
-# risk-weighted improve cases, followed by Negentropy 9B and Qwopus. OmniCoder
-# remains a late fallback because it still leads bug finding, but it overreached
-# on prompt rewriting. The available-model tail is appended at runtime, so this
-# is prioritization, not a hard dependency.
+# Default chain = round-10 2026-07-12 cross-task 4-way validation
+# (topics/candidates-round-10-2026-07-12.md). TeichAI/Fable-5-v1 dethroned
+# OmniCoder in improve (2.46 vs 0.93 in 4-way deep, +1.53), making it the
+# new evidence-fidelity champion. OmniCoder is no longer in the improve
+# chain — it's now depth-only (bug_finding/pdf_extract fallback). Negentropy
+# 9B is the round-7 fallback that held. SetneufPT provides coder-flavored
+# structural output as a tertiary. The available-model tail is appended at
+# runtime, so this is prioritization, not a hard dependency.
 _DEFAULT_IMPROVE_CHAIN = (
-    "cryptidbleh/gemma4-claude-opus-4.6:latest,"
+    "hf.co/TeichAI/Qwen3.5-9B-Fable-5-v1-GGUF:Q4_K_M,"
     "hf.co/Jackrong/Negentropy-claude-opus-4.7-9B-GGUF:Q4_K_M,"
     "SetneufPT/Qwopus3.5-4B-Coder-MTP_Q4_64k_8GB-GPU:latest,"
-    "zfujicute/OmniCoder-Qwen3.5-9B-Claude-4.6-Opus-Uncensored-v2-GGUF:latest"
+    "cryptidbleh/gemma4-claude-opus-4.6:latest"
 )
 
 OLLAMA_MODEL_CANDIDATES = [

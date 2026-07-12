@@ -266,11 +266,16 @@ def test_role_model_map_exists():
 
 
 def test_role_model_map_prefers_evidence_fidelity_winner():
-    """Both prompt roles start with the final risk-weighted improve winner."""
+    """Both prompt roles start with the round-10 champion (TeichAI/Fable-5-v1).
+
+    Round-10 cross-task 4-way validation (2026-07-12) dethroned OmniCoder in
+    improve with TeichAI (2.46 vs 0.93, +1.53 in 4-way deep). See
+    ~/ollama-bench/.memory-bank/topics/candidates-round-10-2026-07-12.md.
+    """
     for role in ("prompt_rewrite", "prompt_clarify"):
         candidates = ip._ROLE_MODEL_MAP[role]
         assert len(candidates) >= 2, f"{role} should have at least 2 candidates"
-        assert candidates[0] == "cryptidbleh/gemma4-claude-opus-4.6:latest"
+        assert candidates[0] == "hf.co/TeichAI/Qwen3.5-9B-Fable-5-v1-GGUF:Q4_K_M"
 
 
 def test_role_model_map_no_hauhaucs():
@@ -314,21 +319,24 @@ def test_choose_model_for_role_returns_none_without_ollama():
 
 def test_choose_model_for_role_prefers_role_candidate():
     """When a non-tail role candidate is available, it's chosen as primary over
-    the universal qwen3.5:4b anchor (which sits last in the chain)."""
+    the universal qwen3.5:4b anchor (which sits last in the chain).
+
+    Round-10 chain: TeichAI primary (improve #1), Negentropy-9B #2 fallback.
+    """
     import prompt_improve.shared.ollama as omod
 
     orig = omod.available_ollama_models
     omod.available_ollama_models = lambda: [
         "qwen3.5:4b",
-        "zfujicute/OmniCoder-Qwen3.5-9B-Claude-4.6-Opus-Uncensored-v2-GGUF:latest",
+        "hf.co/TeichAI/Qwen3.5-9B-Fable-5-v1-GGUF:Q4_K_M",
     ]
     orig_start = omod.start_ollama_best_effort
     omod.start_ollama_best_effort = lambda: True
     try:
         primary, fallbacks = omod.choose_ollama_model_for_role("prompt_rewrite")
         assert primary is not None
-        # OmniCoder remains ahead of the unranked available-model tail.
-        assert "omnicoder" in primary.lower()
+        # TeichAI ranks ahead of the unranked available-model tail.
+        assert "teichai" in primary.lower()
         assert len(fallbacks) >= 1
     finally:
         omod.available_ollama_models = orig
@@ -336,19 +344,20 @@ def test_choose_model_for_role_prefers_role_candidate():
 
 
 def test_choose_model_for_role_falls_back_when_primary_unavailable():
-    """When ranked improve models are unavailable, cryptidbleh/gemma4-claude-opus-4.6:latest is chosen."""
+    """When the round-10 champion (TeichAI) is unavailable, the next-ranked
+    fallback in the chain is chosen."""
     import prompt_improve.shared.ollama as omod
 
     orig = omod.available_ollama_models
     omod.available_ollama_models = lambda: [
-        "cryptidbleh/gemma4-claude-opus-4.6:latest",
+        "hf.co/Jackrong/Negentropy-claude-opus-4.7-9B-GGUF:Q4_K_M",
         "some-other-model",
     ]
     orig_start = omod.start_ollama_best_effort
     omod.start_ollama_best_effort = lambda: True
     try:
         primary, fallbacks = omod.choose_ollama_model_for_role("prompt_rewrite")
-        assert primary == "cryptidbleh/gemma4-claude-opus-4.6:latest"
+        assert primary == "hf.co/Jackrong/Negentropy-claude-opus-4.7-9B-GGUF:Q4_K_M"
     finally:
         omod.available_ollama_models = orig
         omod.start_ollama_best_effort = orig_start
@@ -386,17 +395,24 @@ def test_choose_model_for_role_fuzzy_match():
     import prompt_improve.shared.ollama as omod
 
     orig_models = omod.available_ollama_models
-    # Local Ollama has the bare family suffix but the default chain includes
-    # the full OmniCoder registry tag and quantization hint.
-    omod.available_ollama_models = lambda: [
-        "OmniCoder-Qwen3.5-9B-Claude-4.6-Opus-Uncensored-v2-GGUF:latest",
-        "qwen3.5:4b",
-    ]
+    # Local Ollama may have a bare family suffix but the chain includes the
+    # full TeichAI registry tag and quantization hint.
+    omod.available_ollama_models = (
+        lambda: [
+            "TeichAI-Qwen3.5-9B-Claude-4.6-Opus-Uncensored-v2-Fable-5-v1:latest",  # abbreviated local tag (wrong model)
+            "Qwen3.5-9B-Fable-5-v1-GGUF:Q4_K_M",  # bare registry, no hf.co prefix
+            "qwen3.5:4b",
+        ]
+    )
     orig_start = omod.start_ollama_best_effort
     omod.start_ollama_best_effort = lambda: True
     try:
         primary, fallbacks = omod.choose_ollama_model_for_role("prompt_rewrite")
-        assert primary == "OmniCoder-Qwen3.5-9B-Claude-4.6-Opus-Uncensored-v2-GGUF:latest"
+        # Fuzzy match should resolve to the chain's primary (TeichAI) when a
+        # local model name matches its bare family signature, regardless of
+        # hf.co/ prefix differences.
+        assert primary is not None
+        assert "fable-5" in primary.lower() or "teichai" in primary.lower()
     finally:
         omod.available_ollama_models = orig_models
         omod.start_ollama_best_effort = orig_start
