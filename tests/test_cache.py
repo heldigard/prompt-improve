@@ -115,3 +115,18 @@ def test_prune_expired_keeps_fresh_entries(monkeypatch, tmp_path):
     assert removed == 1
     assert fresh.exists()
     assert not expired.exists()
+
+
+def test_load_cached_rejects_corrupt_entry(monkeypatch, tmp_path):
+    """A partial/corrupt entry is a MISS and gets evicted — never a truthy (None, None)."""
+    import prompt_improve.shared.cache as cmod
+
+    monkeypatch.setattr(cmod, "CACHE_DIR", tmp_path)
+    monkeypatch.setattr(cmod, "CACHE_TTL_SECONDS", 300.0)
+
+    path = cmod._cache_path(cmod._cache_key("some prompt", "rewrite", None))
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text('{"source": "ollama:x"}', encoding="utf-8")
+
+    assert cmod.load_cached("some prompt", "rewrite") is None
+    assert not path.exists(), "corrupt entry must be evicted so the next save can repopulate"

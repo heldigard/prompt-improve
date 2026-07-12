@@ -556,3 +556,27 @@ def test_build_messages_omits_hint_when_no_cwd():
 
     _, user = m._build_messages("rewrite", "fix it", None)
     assert "Execution context (not task scope):" not in user
+
+
+def test_route_hard_prompt_cloud_model_env_override(monkeypatch):
+    """OLLAMA_IMPROVE_CLOUD_MODEL overrides the hard-prompt cloud model at call time."""
+    import prompt_improve.features.improve as m
+
+    captured = {}
+    orig_needs = m.needs_cloud_intelligence
+    orig_cloud = m.call_cloud_cascade
+    m.needs_cloud_intelligence = lambda _p, _mode: True
+    monkeypatch.setenv("OLLAMA_IMPROVE_CLOUD_MODEL", "openai/gpt-5.6-mini")
+
+    def cloud(_p, _mode, _cwd=None, cloud_model=None, target=None):
+        captured["cloud_model"] = cloud_model
+        return ("CLOUD", "cloud:gpt-5.6-mini")
+
+    m.call_cloud_cascade = cloud
+    try:
+        result = m.route_and_improve("hard prompt", "rewrite", None)
+        assert result == ("CLOUD", "cloud:gpt-5.6-mini")
+        assert captured["cloud_model"] == "openai/gpt-5.6-mini"
+    finally:
+        m.needs_cloud_intelligence = orig_needs
+        m.call_cloud_cascade = orig_cloud

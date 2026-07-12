@@ -44,7 +44,9 @@ outcome. For genuinely underspecified prompts it selects a local model and eithe
 - **Clarifies** longer prompts with 1-3 action bullets
 
 If the local Ollama daemon is down, it falls back to the configured cloud cascade.
-If the prompt is hard (security/architecture/migration), it escalates to DeepSeek V4 Flash.
+If the prompt is hard (security/architecture/migration), it escalates to DeepSeek V4
+Flash (override the model with `OLLAMA_IMPROVE_CLOUD_MODEL`, disable escalation with
+`OLLAMA_IMPROVE_CLOUD_INTELLIGENCE=0`).
 
 ## Target profiles
 

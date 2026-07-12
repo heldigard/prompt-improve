@@ -69,63 +69,54 @@ def _try_improve(
     return fallback, "fallback:rules", mode
 
 
-def main() -> None:
-    cwd: str | None = None
-    data: dict | None = None
-    direct_cli = False
-    prompt = ""
+def _handle_cli_flags() -> bool:
+    """Handle --version/--help early so a TTY stdin read never blocks. True when handled."""
+    if len(sys.argv) <= 1:
+        return False
+    first_arg = sys.argv[1].strip()
+    if first_arg in ("--version", "-v"):
+        from prompt_improve import __version__
 
-    # Check command-line arguments for options first to avoid blocking on stdin read when TTY is active
-    if len(sys.argv) > 1:
-        first_arg = sys.argv[1].strip()
-        if first_arg in ("--version", "-v"):
-            from prompt_improve import __version__
+        print(f"prompt-improve version {__version__}")
+        return True
+    if first_arg in ("--help", "-h"):
+        print("prompt-improve — LLM-powered prompt improvement hook")
+        print()
+        print("Usage:")
+        print("  python3 -m prompt_improve.command [prompt]")
+        print("  Or pass a JSON payload containing 'prompt' and optionally 'cwd' via stdin.")
+        print()
+        print("Options:")
+        print("  -v, --version  Show version")
+        print("  -h, --help     Show this help message")
+        return True
+    return False
 
-            print(f"prompt-improve version {__version__}")
-            return
-        if first_arg in ("--help", "-h"):
-            print("prompt-improve — LLM-powered prompt improvement hook")
-            print()
-            print("Usage:")
-            print("  python3 -m prompt_improve.command [prompt]")
-            print("  Or pass a JSON payload containing 'prompt' and optionally 'cwd' via stdin.")
-            print()
-            print("Options:")
-            print("  -v, --version  Show version")
-            print("  -h, --help     Show this help message")
-            return
 
-    # Determine input source: stdin (JSON or plain) vs arguments
-    # If stdin is not a TTY (piped/redirected), try reading from it first
-    # If stdin is a TTY, only read from it if we have no command-line arguments.
-    use_stdin = not sys.stdin.isatty() or len(sys.argv) == 1
+def _read_stdin_payload() -> tuple[str, str | None, dict | None, bool]:
+    """Read stdin JSON-or-plain input. Returns (prompt, cwd, payload, content_read)."""
+    try:
+        content = sys.stdin.read().strip()
+    except OSError:
+        return "", None, None, False
+    if not content:
+        return "", None, None, False
+    try:
+        loaded = json.loads(content)
+    except json.JSONDecodeError:
+        return content, None, None, True
+    if not isinstance(loaded, dict):
+        return content, None, None, True
+    raw_prompt = loaded.get("prompt")
+    prompt = raw_prompt.strip() if isinstance(raw_prompt, str) else ""
+    raw_cwd = loaded.get("cwd") or loaded.get("cwd_path")
+    cwd = raw_cwd if isinstance(raw_cwd, str) else None
+    return prompt, cwd, loaded, True
 
-    content_read = False
-    if use_stdin:
-        try:
-            content = sys.stdin.read().strip()
-            if content:
-                content_read = True
-                try:
-                    loaded = json.loads(content)
-                    data = loaded if isinstance(loaded, dict) else None
-                    if isinstance(data, dict):
-                        prompt = data.get("prompt", "").strip()
-                        cwd = data.get("cwd") or data.get("cwd_path")
-                    else:
-                        prompt = content
-                except json.JSONDecodeError:
-                    prompt = content
-        except OSError:
-            pass
 
-    if not content_read and len(sys.argv) > 1:
-        prompt = " ".join(sys.argv[1:]).strip()
-        direct_cli = True
-
-    target = target_profile_from_request(data)
-
-    if (
+def _worker_opt_out(prompt: str) -> bool:
+    """Worker/marker opt-outs: never improve delegated or explicitly tagged prompts."""
+    return bool(
         "[NO_DELEGATE]" in prompt
         or "[NO_IMPROVE]" in prompt
         or "[CODEX_WORKER]" in prompt
@@ -134,29 +125,23 @@ def main() -> None:
         or os.environ.get("NO_IMPROVE")
         or os.environ.get("CODEX_WORKER")
         or os.environ.get("SWARM_WORKER")
-    ):
-        print(prompt) if direct_cli else _passthrough()
-        return
+    )
 
-    if not prompt or detect_trivial(prompt):
-        print(prompt) if direct_cli else _passthrough()
-        return
 
+def _improve_and_emit(prompt: str, cwd: str | None, data: dict | None, direct_cli: bool) -> None:
+    """Run the improvement pipeline and emit hook JSON or direct-CLI text."""
     mode = decide_mode(prompt)
 
     # The hook cannot see prior turns. Preserve anaphoric prompts so the large
     # model can resolve them against its own conversation context.
-    if depends_on_conversation_context(prompt):
+    # Also preserve prompts that already give the large model an actionable
+    # scope: unsolicited "clarification" can dilute a long, precise request
+    # just as easily as a full rewrite can.
+    if depends_on_conversation_context(prompt) or has_concrete_target(prompt):
         print(prompt) if direct_cli else _passthrough()
         return
 
-    # Preserve prompts that already give the large model an actionable scope.
-    # This applies to both modes: unsolicited "clarification" can dilute a long,
-    # precise request just as easily as a full rewrite can.
-    if has_concrete_target(prompt):
-        print(prompt) if direct_cli else _passthrough()
-        return
-
+    target = target_profile_from_request(data)
     improved, source, effective_mode = _try_improve(prompt, mode, cwd, target)
 
     if not improved:
@@ -177,6 +162,35 @@ def main() -> None:
         },
     }
     print(json.dumps(output, ensure_ascii=False))
+
+
+def main() -> None:
+    if _handle_cli_flags():
+        return
+
+    # Determine input source: stdin (JSON or plain) vs arguments
+    # If stdin is not a TTY (piped/redirected), try reading from it first
+    # If stdin is a TTY, only read from it if we have no command-line arguments.
+    use_stdin = not sys.stdin.isatty() or len(sys.argv) == 1
+
+    prompt, cwd, data, content_read = ("", None, None, False)
+    if use_stdin:
+        prompt, cwd, data, content_read = _read_stdin_payload()
+
+    direct_cli = False
+    if not content_read and len(sys.argv) > 1:
+        prompt = " ".join(sys.argv[1:]).strip()
+        direct_cli = True
+
+    if _worker_opt_out(prompt) or not prompt or detect_trivial(prompt):
+        print(prompt) if direct_cli else _passthrough()
+        return
+
+    try:
+        _improve_and_emit(prompt, cwd, data, direct_cli)
+    except Exception as exc:  # fail OPEN: the hook must never degrade prompt submission
+        print(f"[prompt-improve] unexpected error, passing through: {exc}", file=sys.stderr)
+        print(prompt) if direct_cli else _passthrough()
 
 
 if __name__ == "__main__":

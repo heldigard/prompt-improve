@@ -31,3 +31,4 @@ uv.lock
 
 # cli-orchestration: cross-CLI coordination registry (runtime noise, auto-managed)
 .memory-bank/blocked-writes.log
+.memory-bank/control-plane/

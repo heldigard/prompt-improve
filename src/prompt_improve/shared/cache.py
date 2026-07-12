@@ -88,7 +88,14 @@ def load_cached(prompt: str, mode: str, cwd: str | None = None) -> tuple[str, st
             path.unlink(missing_ok=True)
             return None
         data = json.loads(path.read_text(encoding="utf-8"))
-        return data.get("text"), data.get("source")
+        text = data.get("text")
+        source = data.get("source")
+        # A corrupt/partial entry must be a MISS, not a truthy (None, None)
+        # tuple that silently disables improvement until the TTL expires.
+        if not isinstance(text, str) or not text or not isinstance(source, str):
+            path.unlink(missing_ok=True)
+            return None
+        return text, source
     except (OSError, json.JSONDecodeError, ValueError):
         return None
 

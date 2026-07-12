@@ -242,12 +242,17 @@ def route_and_improve(
     """Intelligent model router: hard → cloud first, else local first; cloud as availability fallback."""
     target = target or target_profile_from_request()
     if needs_cloud_intelligence(prompt, mode):
-        _debug("hard prompt → cloud-first (deepseek-v4-flash)")
+        # Read at call time (like the classifier's toggle) so tests and shell
+        # wrappers can override without reloading the module.
+        cloud_model = (
+            os.environ.get("OLLAMA_IMPROVE_CLOUD_MODEL", "").strip() or "deepseek/deepseek-v4-flash"
+        )
+        _debug(f"hard prompt → cloud-first ({cloud_model})")
         result = call_cloud_cascade(
             prompt,
             mode,
             cwd,
-            cloud_model="deepseek/deepseek-v4-flash",
+            cloud_model=cloud_model,
             target=target,
         )
         if result:

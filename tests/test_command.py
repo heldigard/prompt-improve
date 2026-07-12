@@ -349,3 +349,40 @@ def test_command_main_help_flags_print_usage_and_return_early():
         assert "Usage:" in out
         assert "python3 -m prompt_improve.command [prompt]" in out
         assert "hookSpecificOutput" not in out
+
+
+def test_main_passthrough_on_null_prompt_payload():
+    """A payload with prompt: null must passthrough instead of crashing on .strip()."""
+    import prompt_improve.command as cmd_mod
+
+    stdin_data = json.dumps({"prompt": None, "cwd": 42})
+    old_stdin = sys.stdin
+    sys.stdin = io.StringIO(stdin_data)
+    captured = {}
+
+    import builtins
+
+    old_print = print
+    builtins.print = lambda *a, **k: captured.update({"output": a[0]})
+    try:
+        cmd_mod.main()
+    finally:
+        sys.stdin = old_stdin
+        builtins.print = old_print
+    out = json.loads(captured["output"])
+    assert out["continue"] is True
+    assert "hookSpecificOutput" not in out
+
+
+def test_command_main_fails_open_on_unexpected_error(monkeypatch):
+    """An unexpected pipeline exception must fail OPEN (passthrough), never crash the hook."""
+    import prompt_improve.command as cmd_mod
+
+    def boom(*_args, **_kwargs):
+        raise RuntimeError("synthetic pipeline failure")
+
+    monkeypatch.setattr(cmd_mod, "_improve_and_emit", boom)
+    out = _run_main_via_stdin("mejora el rendimiento del parser de configuracion")
+    data = json.loads(out)
+    assert data["continue"] is True
+    assert "hookSpecificOutput" not in data
