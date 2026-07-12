@@ -2,12 +2,40 @@
 
 from __future__ import annotations
 
+import math
 import os
 import re
 from pathlib import Path
 
 from prompt_improve.shared import compat
 from prompt_improve.shared.ollama_url import normalize_ollama_url
+
+
+def _finite_float(value: str | None, default: float) -> float:
+    """Parse a finite float, returning ``default`` for malformed input."""
+    try:
+        parsed = float(value) if value is not None else default
+    except (TypeError, ValueError):
+        return default
+    return parsed if math.isfinite(parsed) else default
+
+
+def _positive_finite_float(value: str | None, default: float) -> float:
+    """Parse a positive finite float, returning ``default`` otherwise."""
+    parsed = _finite_float(value, default)
+    return parsed if parsed > 0 else default
+
+
+def _positive_decimal_int(value: str | None, default: int) -> int:
+    """Parse a positive base-10 integer, returning ``default`` otherwise."""
+    if value is None:
+        return default
+    try:
+        parsed = int(value.strip(), 10)
+    except (TypeError, ValueError):
+        return default
+    return parsed if parsed > 0 else default
+
 
 # ---------------------------------------------------------------------------
 # Ollama config
@@ -18,8 +46,8 @@ OLLAMA_URL = normalize_ollama_url(
         getattr(compat.ollama_client, "DEFAULT_URL", "http://127.0.0.1:11434"),
     )
 )
-OLLAMA_TIMEOUT = float(os.environ.get("OLLAMA_IMPROVE_TIMEOUT", "45.0"))
-OLLAMA_TOTAL_TIMEOUT = float(os.environ.get("OLLAMA_IMPROVE_TOTAL_TIMEOUT", "24.0"))
+OLLAMA_TIMEOUT = _positive_finite_float(os.environ.get("OLLAMA_IMPROVE_TIMEOUT"), 45.0)
+OLLAMA_TOTAL_TIMEOUT = _positive_finite_float(os.environ.get("OLLAMA_IMPROVE_TOTAL_TIMEOUT"), 24.0)
 OLLAMA_AUTOSTART = os.environ.get("OLLAMA_IMPROVE_AUTOSTART", "1") != "0"
 CLOUD_FALLBACK = os.environ.get("OLLAMA_IMPROVE_CLOUD_FALLBACK", "1") != "0"
 OLLAMA_LOG = os.path.expanduser("~/.ollama/logs/ollama-serve.log")
@@ -69,13 +97,13 @@ for _role, _default in [
 # Cache config
 # ---------------------------------------------------------------------------
 CACHE_DIR = Path.home() / ".claude" / "cache" / "prompt-improve"
-CACHE_TTL_SECONDS = float(os.environ.get("OLLAMA_IMPROVE_CACHE_TTL", "300.0"))
+CACHE_TTL_SECONDS = _finite_float(os.environ.get("OLLAMA_IMPROVE_CACHE_TTL"), 300.0)
 CACHE_SCHEMA_VERSION = "prompt-improve-v20"
 
 # ---------------------------------------------------------------------------
 # Rewrite threshold
 # ---------------------------------------------------------------------------
-REWRITE_THRESHOLD = int(os.environ.get("OLLAMA_IMPROVE_REWRITE_THRESHOLD", "260"))
+REWRITE_THRESHOLD = _positive_decimal_int(os.environ.get("OLLAMA_IMPROVE_REWRITE_THRESHOLD"), 260)
 
 # ---------------------------------------------------------------------------
 # Task verbs (EN + ES) — used by detect_trivial and hard-prompt classifier

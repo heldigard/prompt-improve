@@ -48,6 +48,19 @@ If the prompt is hard (security/architecture/migration), it escalates to DeepSee
 Flash (override the model with `OLLAMA_IMPROVE_CLOUD_MODEL`, disable escalation with
 `OLLAMA_IMPROVE_CLOUD_INTELLIGENCE=0`).
 
+### Runtime configuration
+
+Malformed numeric or URL overrides fall back to safe defaults instead of preventing
+the hook from loading.
+
+| Variable | Default | Accepted values |
+|---|---:|---|
+| `OLLAMA_IMPROVE_TIMEOUT` | `45.0` | Positive finite seconds per primary model attempt |
+| `OLLAMA_IMPROVE_TOTAL_TIMEOUT` | `24.0` | Positive finite seconds shared by local fallbacks |
+| `OLLAMA_IMPROVE_CACHE_TTL` | `300.0` | Finite seconds; `0` or a negative value disables caching |
+| `OLLAMA_IMPROVE_REWRITE_THRESHOLD` | `260` | Positive base-10 character count |
+| `OLLAMA_URL` | client default or `http://127.0.0.1:11434` | HTTP loopback URL (`localhost`, `127.0.0.1`, or `::1`) |
+
 ## Target profiles
 
 The local Ollama model improves the prompt, but the output is optimized for the
