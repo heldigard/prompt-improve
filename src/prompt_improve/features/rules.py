@@ -166,6 +166,22 @@ _SUGGESTIONS = {
         "Coloca la tarea DESPUÉS del material fuente para mejor calidad de respuesta.",
         "Place the task AFTER the source material for better response quality.",
     ),
+    "angular_patterns": (
+        "Considera usar componentes standalone, signals, zoneless e inject() para Angular v22.",
+        "Consider specifying standalone components, signals, zoneless, and inject() for Angular v22.",
+    ),
+    "react_patterns": (
+        "Considera usar React 19: Server Components, Actions y useActionState.",
+        "Consider using React 19: Server Components, Actions, and useActionState.",
+    ),
+    "css_patterns": (
+        "Considera usar CSS moderno puro (container queries, :has, oklch) y evitar Tailwind a menos que se pida expresamente.",
+        "Consider using modern vanilla CSS (container queries, :has, oklch) and avoiding Tailwind unless explicitly requested.",
+    ),
+    "python_patterns": (
+        "Considera usar tipado estricto (evitar Any), Pydantic v2 y async/await en Python.",
+        "Consider using strict type hints (avoid Any), Pydantic v2, and async/await in Python.",
+    ),
 }
 
 
@@ -224,6 +240,23 @@ def rule_based_suggestions(prompt: str) -> str | None:
 
     if _task_before_fenced_code(prompt):
         keys.append("task_after_source")
+
+    # Ecosystem skill / pattern checks
+    if re.search(r"\b(?:angular|ng-)\b", p):
+        if not any(w in p for w in ["signal", "standalone", "inject"]):
+            keys.append("angular_patterns")
+
+    if re.search(r"\breact\b", p):
+        if not any(w in p for w in ["server", "action", "useaction"]):
+            keys.append("react_patterns")
+
+    if re.search(r"\b(?:css|styling|estilo|diseño)\b", p) and not re.search(r"\btailwind\b", p):
+        if not any(w in p for w in ["container", "has", "oklch"]):
+            keys.append("css_patterns")
+
+    if re.search(r"\b(?:python|fastapi|pydantic)\b", p):
+        if not any(w in p for w in ["type", "tipado", "async", "await"]):
+            keys.append("python_patterns")
 
     if not keys:
         return None

@@ -120,7 +120,7 @@ def _build_messages(
     strings; the caller wraps them in the chat-message shape its backend expects.
     """
     language = detect_language(prompt)
-    hint = project_hint_for_prompt(prompt, cwd)
+    hint = project_hint_for_prompt(prompt, cwd, language)
     hint_line = f"Execution context (not task scope): {hint}\n" if hint else ""
     if mode == "rewrite":
         system = build_rewrite_system_prompt(language, target)

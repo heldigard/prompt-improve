@@ -8,6 +8,7 @@
 ## Status
 - No active implementation guide. Completed work is in progress.md.
 
+- [x] 2026-07-13: Integrated ecosystem-level skill shaping (shaping hints + rule-based suggestions).
 - [x] 2026-07-11: memoria de cierre de sesión y handoff actualizada.
 
 ## Status — carried over (stable)
@@ -17,3 +18,4 @@
 ## Next (optional, non-blocking)
 - Refresh behavior hints when `~/.claude/rules/model-specific.md` documents new family failure-modes (one-line edit per `SHAPES` entry).
 - If a new model family appears in the CLI fleet: add one `SHAPES` entry + one `_looks_like_*` matcher.
+

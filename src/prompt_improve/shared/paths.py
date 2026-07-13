@@ -296,8 +296,107 @@ def _existing_path_correction(prompt: str) -> str:
     return ""
 
 
-def project_hint_for_prompt(prompt: str, cwd: str | None) -> str:
-    """Project anchor used by the LLM prompt improver (cwd + currentTask + topic)."""
+def _ecosystem_skill_hint(prompt: str, language: str | None = None) -> str:
+    """Return a short guideline hint if the prompt relates to a registered ecosystem skill.
+
+    Deterministic keyword matching that guides the LLM to structure prompt expansion
+    using our local ecosystem's preferred patterns and version requirements.
+    """
+    p = prompt.lower()
+    if language is None:
+        spanish_indicators = r"\b(?:que|como|para|con|las?|los?|un?a?s?|es|son|del|en|revisa|crea|arregla|implementa|cómo|continuar|tarea)\b"
+        if re.search(spanish_indicators, p):
+            language = "Spanish"
+        else:
+            language = "English"
+
+    is_sp = language == "Spanish"
+
+    # Check Angular
+    if re.search(r"\bangular\b|\bng-|\b@angular\b|\bngx-", p):
+        return (
+            "pauta del ecosistema: Para Angular, usa Angular v22, componentes standalone, signals+zoneless, @if/@for, inject() y Signal Forms."
+            if is_sp
+            else "ecosystem guideline: For Angular, use Angular v22, standalone, signals+zoneless, @if/@for, inject(), and Signal Forms."
+        )
+    # Check React
+    if re.search(r"\breact\b|\bjsx\b|\btsx\b|\bnextjs\b|\bnext\.js\b", p):
+        return (
+            "pauta del ecosistema: Para React, usa React 19, Server Components, Actions y useActionState/useOptimistic."
+            if is_sp
+            else "ecosystem guideline: For React, use React 19, Server Components, Actions, and useActionState/useOptimistic."
+        )
+    # Check Svelte
+    if re.search(r"\bsvelte\b|\bsveltekit\b", p):
+        return (
+            "pauta del ecosistema: Para Svelte, usa Svelte 5 runes ($state, $derived, $effect, $props) y sintaxis onclick."
+            if is_sp
+            else "ecosystem guideline: For Svelte, use Svelte 5 runes ($state, $derived, $effect, $props) and onclick event syntax."
+        )
+    # Check Vue
+    if re.search(r"\bvue\b|\bvuejs\b|\bpinia\b|\bnuxt\b", p):
+        return (
+            "pauta del ecosistema: Para Vue, usa Vue 3.5 Composition API, <script setup> y Pinia."
+            if is_sp
+            else "ecosystem guideline: For Vue, use Vue 3.5 Composition API, <script setup>, and Pinia."
+        )
+    # Check Tailwind
+    if re.search(r"\btailwind\b|\btailwindcss\b", p):
+        return (
+            "pauta del ecosistema: Para Tailwind, usa Tailwind CSS v4, motor Oxide y configuración @theme."
+            if is_sp
+            else "ecosystem guideline: For Tailwind, use Tailwind CSS v4, Oxide engine, and @theme configuration."
+        )
+    # Check CSS (excluding Tailwind)
+    if re.search(r"\bcss\b|\bstyling\b|\bstyle\b|\bestilos\b|\bestilo\b|\bdiseño\b", p):
+        return (
+            "pauta del ecosistema: Para CSS, usa CSS moderno puro (container queries, :has, @layer, oklch, grid/flex) y evita Tailwind a menos que se pida expresamente."
+            if is_sp
+            else "ecosystem guideline: For CSS, use modern vanilla CSS (container queries, :has, @layer, oklch, grid/flex) and avoid Tailwind unless explicitly requested."
+        )
+    # Check Python
+    if re.search(r"\bpython\b|\bpy\b|\bfastapi\b|\bsqlalchemy\b|\bpydantic\b", p):
+        return (
+            "pauta del ecosistema: Para Python, usa tipado estricto (evitar Any), Pydantic v2 y async/await. Captura solo excepciones específicas."
+            if is_sp
+            else "ecosystem guideline: For Python, use strict type hints (no Any), Pydantic v2, and async/await. Catch only specific exceptions."
+        )
+    # Check JS/TS
+    if re.search(r"\btypescript\b|\bts\b|\bjavascript\b|\bjs\b|\bnode\b|\bnodejs\b", p):
+        return (
+            "pauta del ecosistema: Para JS/TS, usa ES2023+, ESM, type-safe guards e imports limpios."
+            if is_sp
+            else "ecosystem guideline: For JS/TS, use ES2023+, ESM, type-safe guards, and clean imports."
+        )
+    # Check Git/Commit
+    if re.search(r"\bgit commit\b|\bcommit message\b|\bgit log\b|\bmensaje de commit\b|\bconvencional\b", p):
+        return (
+            "pauta del ecosistema: Para git commits, escribe un mensaje de commit convencional (Conventional Commit) que coincida con el skill git-commit."
+            if is_sp
+            else "ecosystem guideline: For git commits, write a Conventional Commit message matching the git-commit skill."
+        )
+    # Check Memory Bank
+    if re.search(
+        r"\bmemory bank\b|\bmemoria\b|\b\.memory-bank\b|\bcurrenttask\b|\bactivecontext\b|\bprogress\.md\b",
+        p,
+    ):
+        return (
+            "pauta del ecosistema: Para memoria, actualiza y mantén los archivos de .memory-bank (MEMORY.md, CONTEXT.md, progress.md) usando la estructura del skill agent-memory."
+            if is_sp
+            else "ecosystem guideline: For memory, update/maintain memory files (MEMORY.md, CONTEXT.md, progress.md) using agent-memory skill structure."
+        )
+    # Check Spring Boot/JPA
+    if re.search(r"\bjpa\b|\bhibernate\b|\bspring boot\b|\bspring-boot\b", p):
+        return (
+            "pauta del ecosistema: Para Spring Boot/JPA, evita consultas N+1, usa lazy loading y respeta límites transaccionales."
+            if is_sp
+            else "ecosystem guideline: For Spring Boot/JPA, avoid N+1 queries, use lazy loading, and follow transactional boundaries."
+        )
+    return ""
+
+
+def project_hint_for_prompt(prompt: str, cwd: str | None, language: str | None = None) -> str:
+    """Project anchor used by the LLM prompt improver (cwd + currentTask + topic + skills)."""
     if not cwd:
         return ""
     try:
@@ -317,4 +416,7 @@ def project_hint_for_prompt(prompt: str, cwd: str | None) -> str:
     path_hint = _existing_path_correction(prompt)
     if path_hint:
         base = f"{base}; {path_hint}"
+    skill_hint = _ecosystem_skill_hint(prompt, language)
+    if skill_hint:
+        base = f"{base}; {skill_hint}"
     return base
