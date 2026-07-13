@@ -8,6 +8,7 @@
 ## Status
 - No active implementation guide. Completed work is in progress.md.
 
+- [x] 2026-07-13: Synchronized surrounding configurations (ollama-warmup.sh, README.md, CLAUDE.md) with primary model.
 - [x] 2026-07-13: Extended ecosystem-level skill shaping to NestJS, Browser Automation, Kubernetes, and Java.
 - [x] 2026-07-13: Integrated ecosystem-level skill shaping (shaping hints + rule-based suggestions).
 - [x] 2026-07-11: memoria de cierre de sesión y handoff actualizada.

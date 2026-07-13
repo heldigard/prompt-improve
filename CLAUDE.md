@@ -47,7 +47,7 @@ scripts/
 
 Two tiers:
 1. **Local** (Ollama): role-based selection via `_ROLE_MODEL_MAP`
-   (cryptidbleh primary, Negentropy/Qwopus/OmniCoder fallbacks by current ranking).
+   (TeichAI primary, Negentropy/Qwopus/Gemma4 fallbacks by current ranking).
 2. **Cloud**: hard-prompt escalation to DeepSeek V4 Flash; availability fallback
    to Ling cascade when Ollama is down.
 
