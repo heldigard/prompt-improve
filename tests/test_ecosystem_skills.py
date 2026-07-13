@@ -1,8 +1,9 @@
 from __future__ import annotations
 
 from pathlib import Path
-from prompt_improve.shared.paths import project_hint_for_prompt, _ecosystem_skill_hint
+
 from prompt_improve.features.rules import rule_based_suggestions
+from prompt_improve.shared.paths import _ecosystem_skill_hint, project_hint_for_prompt
 
 
 def test_ecosystem_skill_hint_detection_english() -> None:
@@ -22,6 +23,22 @@ def test_ecosystem_skill_hint_detection_english() -> None:
     hint = _ecosystem_skill_hint("write fastapi endpoint in python", "English")
     assert "ecosystem guideline: For Python, use strict type hints" in hint
 
+    # NestJS
+    hint = _ecosystem_skill_hint("setup a nestjs controller", "English")
+    assert "ecosystem guideline: For NestJS, use modular architecture" in hint
+
+    # Browser
+    hint = _ecosystem_skill_hint("write browser automation script in playwright", "English")
+    assert "ecosystem guideline: For browser automation, use agent-browser CLI" in hint
+
+    # Kubernetes
+    hint = _ecosystem_skill_hint("deploy to kubernetes using helm", "English")
+    assert "ecosystem guideline: For Kubernetes, prefer Gateway API" in hint
+
+    # Java
+    hint = _ecosystem_skill_hint("build maven project in java", "English")
+    assert "ecosystem guideline: For Java, use custom exception handling" in hint
+
 
 def test_ecosystem_skill_hint_detection_spanish() -> None:
     # Angular
@@ -35,6 +52,24 @@ def test_ecosystem_skill_hint_detection_spanish() -> None:
     # CSS
     hint = _ecosystem_skill_hint("escribir estilos de css", "Spanish")
     assert "pauta del ecosistema: Para CSS, usa CSS moderno puro" in hint
+
+    # NestJS
+    hint = _ecosystem_skill_hint("configurar controlador nestjs", "Spanish")
+    assert "pauta del ecosistema: Para NestJS, usa arquitectura modular" in hint
+
+    # Browser
+    hint = _ecosystem_skill_hint("hacer scraping con playwright", "Spanish")
+    assert (
+        "pauta del ecosistema: Para automatización de navegador, usa el CLI agent-browser" in hint
+    )
+
+    # Kubernetes
+    hint = _ecosystem_skill_hint("desplegar en kubernetes", "Spanish")
+    assert "pauta del ecosistema: Para Kubernetes, usa Gateway API" in hint
+
+    # Java
+    hint = _ecosystem_skill_hint("proyecto java con maven", "Spanish")
+    assert "pauta del ecosistema: Para Java, usa manejo de excepciones personalizado" in hint
 
 
 def test_ecosystem_skill_hint_implicit_language() -> None:
@@ -73,3 +108,23 @@ def test_rule_based_suggestions_for_ecosystem_skills() -> None:
     suggestions = rule_based_suggestions("cómo escribir endpoints en python")
     assert suggestions is not None
     assert "tipado estricto (evitar Any), Pydantic v2" in suggestions
+
+    # NestJS missing key features
+    suggestions = rule_based_suggestions("cómo configurar nestjs")
+    assert suggestions is not None
+    assert "arquitectura modular (módulos, controladores, servicios)" in suggestions
+
+    # Browser missing key features
+    suggestions = rule_based_suggestions("run a playwright browser flow")
+    assert suggestions is not None
+    assert "element REFs (not coordinates) with agent-browser CLI" in suggestions
+
+    # Kubernetes missing key features
+    suggestions = rule_based_suggestions("cómo configurar kubernetes")
+    assert suggestions is not None
+    assert "Gateway API, Helm y GitOps (ArgoCD/Flux)" in suggestions
+
+    # Java missing key features
+    suggestions = rule_based_suggestions("build a java library")
+    assert suggestions is not None
+    assert "custom exception handling, SLF4J/MDC for logging" in suggestions

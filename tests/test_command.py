@@ -259,10 +259,12 @@ def test_command_main_falls_through_when_no_model_available():
     import prompt_improve.command as cmd
 
     orig = cmd.route_and_improve
+
     def dummy_route_and_improve(
         prompt: str, mode: str, cwd: str | None, target: Any = None
     ) -> tuple[str, str] | None:
         return None
+
     cmd.route_and_improve = dummy_route_and_improve
     try:
         out = _run_main_via_stdin("asdfgh qwerty", cwd="/nonexistent")

@@ -369,7 +369,9 @@ def _ecosystem_skill_hint(prompt: str, language: str | None = None) -> str:
             else "ecosystem guideline: For JS/TS, use ES2023+, ESM, type-safe guards, and clean imports."
         )
     # Check Git/Commit
-    if re.search(r"\bgit commit\b|\bcommit message\b|\bgit log\b|\bmensaje de commit\b|\bconvencional\b", p):
+    if re.search(
+        r"\bgit commit\b|\bcommit message\b|\bgit log\b|\bmensaje de commit\b|\bconvencional\b", p
+    ):
         return (
             "pauta del ecosistema: Para git commits, escribe un mensaje de commit convencional (Conventional Commit) que coincida con el skill git-commit."
             if is_sp
@@ -391,6 +393,37 @@ def _ecosystem_skill_hint(prompt: str, language: str | None = None) -> str:
             "pauta del ecosistema: Para Spring Boot/JPA, evita consultas N+1, usa lazy loading y respeta límites transaccionales."
             if is_sp
             else "ecosystem guideline: For Spring Boot/JPA, avoid N+1 queries, use lazy loading, and follow transactional boundaries."
+        )
+    # Check NestJS
+    if re.search(r"\bnestjs\b|\b@nestjs\b", p):
+        return (
+            "pauta del ecosistema: Para NestJS, usa arquitectura modular (módulos, controladores, servicios), DTOs e inyección de dependencias."
+            if is_sp
+            else "ecosystem guideline: For NestJS, use modular architecture, controllers, services, DTOs, and dependency injection."
+        )
+    # Check Browser Automation / Playwright
+    if re.search(
+        r"\bplaywright\b|\bwebdriver\b|\bselenium\b|\bbrowser automation\b|\bautomatizaci[oó]n de navegador\b|\bscraping\b|\bscrape\b",
+        p,
+    ):
+        return (
+            "pauta del ecosistema: Para automatización de navegador, usa el CLI agent-browser con referencias a elementos (no coordenadas). Para pruebas, usa Playwright .spec.ts."
+            if is_sp
+            else "ecosystem guideline: For browser automation, use agent-browser CLI with element REFs (not coordinates). For browser tests, use Playwright .spec.ts."
+        )
+    # Check Kubernetes
+    if re.search(r"\bkubernetes\b|\bk8s\b|\bhelm\b|\bkubectl\b", p):
+        return (
+            "pauta del ecosistema: Para Kubernetes, usa Gateway API, Helm, GitOps (ArgoCD/Flux) y sidecars nativos."
+            if is_sp
+            else "ecosystem guideline: For Kubernetes, prefer Gateway API, Helm, GitOps (ArgoCD/Flux), and native sidecars."
+        )
+    # Check Java (excluding Spring Boot / JPA since they match earlier)
+    if re.search(r"\bjava\b|\bmaven\b|\bgradle\b|\bpom\.xml\b", p):
+        return (
+            "pauta del ecosistema: Para Java, usa manejo de excepciones personalizado, SLF4J/MDC para logging estructurado y virtual threads para concurrencia."
+            if is_sp
+            else "ecosystem guideline: For Java, use custom exception handling, SLF4J/MDC for structured logging, and virtual threads for concurrency."
         )
     return ""
 

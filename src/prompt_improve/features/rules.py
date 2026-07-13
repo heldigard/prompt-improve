@@ -182,6 +182,22 @@ _SUGGESTIONS = {
         "Considera usar tipado estricto (evitar Any), Pydantic v2 y async/await en Python.",
         "Consider using strict type hints (avoid Any), Pydantic v2, and async/await in Python.",
     ),
+    "nestjs_patterns": (
+        "Considera usar arquitectura modular (módulos, controladores, servicios), DTOs e inyección de dependencias en NestJS.",
+        "Consider using modular architecture (modules, controllers, services), DTOs, and dependency injection in NestJS.",
+    ),
+    "browser_patterns": (
+        "Considera usar referencias de elementos (no coordenadas) con el CLI agent-browser y Playwright .spec.ts para pruebas.",
+        "Consider using element REFs (not coordinates) with agent-browser CLI and Playwright .spec.ts for tests.",
+    ),
+    "k8s_patterns": (
+        "Considera usar Gateway API, Helm y GitOps (ArgoCD/Flux) para Kubernetes.",
+        "Consider using Gateway API, Helm, and GitOps (ArgoCD/Flux) for Kubernetes.",
+    ),
+    "java_patterns": (
+        "Considera usar manejo de excepciones personalizado, SLF4J/MDC para logging y virtual threads para concurrencia.",
+        "Consider using custom exception handling, SLF4J/MDC for logging, and virtual threads for concurrency.",
+    ),
 }
 
 
@@ -257,6 +273,24 @@ def rule_based_suggestions(prompt: str) -> str | None:
     if re.search(r"\b(?:python|fastapi|pydantic)\b", p):
         if not any(w in p for w in ["type", "tipado", "async", "await"]):
             keys.append("python_patterns")
+
+    if re.search(r"\b(?:nestjs|@nestjs)\b", p):
+        if not any(w in p for w in ["modul", "controll", "servic", "inject"]):
+            keys.append("nestjs_patterns")
+
+    if re.search(r"\b(?:playwright|browser|selenium|webdriver|scrap|navegador)\b", p):
+        if not any(w in p for w in ["spec", "ref", "test", "selector"]):
+            keys.append("browser_patterns")
+
+    if re.search(r"\b(?:kubernetes|k8s|helm|kubectl)\b", p):
+        if not any(w in p for w in ["gateway", "gitops", "argo", "manifest"]):
+            keys.append("k8s_patterns")
+
+    if re.search(r"\b(?:java|maven|gradle|pom\.xml)\b", p) and not re.search(
+        r"\b(?:spring|jpa|hibernate)\b", p
+    ):
+        if not any(w in p for w in ["exception", "excepción", "log", "thread", "concurren"]):
+            keys.append("java_patterns")
 
     if not keys:
         return None
