@@ -76,7 +76,38 @@ def target_profile_from_request(data: dict | None = None) -> TargetProfile:
     if not model and cli == "codex":
         model = _codex_default_model()
 
+    shape_by = os.environ.get("PROMPT_IMPROVE_SHAPE_BY", "model").strip().lower()
+    # When shaping by CLI, the prompt follows the CLI's conventions (e.g. Claude
+    # XML tags) even when a proxy routes to a different model family underneath.
+    if shape_by == "cli" and cli:
+        return profile_for_cli(cli, model or "unknown")
     return profile_for_model(model or "unknown", cli or "generic")
+
+
+# Canonical CLI → (family, style) mapping. Single source of truth shared by
+# profile_for_model's CLI fallback branch and profile_for_cli (the
+# PROMPT_IMPROVE_SHAPE_BY=cli path), so both agree on which family/style a CLI
+# maps to. 'codex' is included for profile_for_cli; profile_for_model returns
+# earlier on the openai/codex branch before reaching this dict.
+_CLI_FAMILY_STYLE: dict[str, tuple[str, str]] = {
+    "claude": ("claude", "xml-tags"),
+    "codex": ("openai-gpt", "codex-markdown"),
+    "agy": ("gemini", "component-blocks"),
+    "antigravity": ("gemini", "component-blocks"),
+    "gemini": ("gemini", "component-blocks"),
+    "qwen": ("qwen", "literal-markdown"),
+    "qwenc": ("qwen", "literal-markdown"),
+    "dseek": ("deepseek", "explicit-steps"),
+    "deepseek": ("deepseek", "explicit-steps"),
+    "mini": ("minimax", "agentic-markdown"),
+    "minimax": ("minimax", "agentic-markdown"),
+    "codex-minimax": ("minimax", "agentic-markdown"),
+    "kimi": ("kimi", "agentic-markdown"),
+    "kimic": ("kimi", "agentic-markdown"),
+    "mimo": ("mimo", "explicit-steps"),
+    "zai": ("glm", "explicit-steps"),
+    "glm": ("glm", "explicit-steps"),
+}
 
 
 def profile_for_model(model: str, cli: str | None = None) -> TargetProfile:
@@ -119,23 +150,25 @@ def profile_for_model(model: str, cli: str | None = None) -> TargetProfile:
         return TargetProfile(
             clean_cli, clean_model, "openai-gpt", _version(lower), _openai_style(lower)
         )
-    if clean_cli == "claude":
-        return TargetProfile(clean_cli, clean_model, "claude", _version(lower), "xml-tags")
-    if clean_cli in {"agy", "antigravity", "gemini"}:
-        return TargetProfile(clean_cli, clean_model, "gemini", _version(lower), "component-blocks")
-    if clean_cli in {"qwen", "qwenc"}:
-        return TargetProfile(clean_cli, clean_model, "qwen", _version(lower), "literal-markdown")
-    if clean_cli in {"dseek", "deepseek"}:
-        return TargetProfile(clean_cli, clean_model, "deepseek", _version(lower), "explicit-steps")
-    if clean_cli in {"mini", "minimax", "codex-minimax"}:
-        return TargetProfile(clean_cli, clean_model, "minimax", _version(lower), "agentic-markdown")
-    if clean_cli in {"kimi", "kimic"}:
-        return TargetProfile(clean_cli, clean_model, "kimi", _version(lower), "agentic-markdown")
-    if clean_cli in {"mimo"}:
-        return TargetProfile(clean_cli, clean_model, "mimo", _version(lower), "explicit-steps")
-    if clean_cli in {"zai", "glm"}:
-        return TargetProfile(clean_cli, clean_model, "glm", _version(lower), "explicit-steps")
+    cli_style = _CLI_FAMILY_STYLE.get(clean_cli)
+    if cli_style is not None:
+        family, style = cli_style
+        return TargetProfile(clean_cli, clean_model, family, _version(lower), style)
     return TargetProfile(clean_cli, clean_model, "generic", _version(lower), "plain-markdown")
+
+
+def profile_for_cli(cli: str, model: str = "unknown") -> TargetProfile:
+    """Build a profile whose family/style follow the CLI, not the underlying model.
+
+    Used when ``PROMPT_IMPROVE_SHAPE_BY=cli``: under a proxy (e.g. Claude Code on
+    a GLM backend) a user may want the prompt shaped for the CLI's conventions
+    (Claude XML tags) rather than the model the proxy routes to. The real model
+    is still carried for cache partitioning and version notes.
+    """
+    clean_cli = (cli or "generic").lower()
+    clean_model = (model or "unknown").strip()
+    family, style = _CLI_FAMILY_STYLE.get(clean_cli, ("generic", "plain-markdown"))
+    return TargetProfile(clean_cli, clean_model, family, _version(clean_model.lower()), style)
 
 
 # ---- payload / env parsing -------------------------------------------------
@@ -331,6 +364,11 @@ def _qwen_style(text: str) -> str:
 
 
 def _deepseek_style(text: str) -> str:
+    # R1 / deepseek-reasoner is a PURE reasoning model (distinct prompting: no
+    # system prompt, zero-shot, temp ~0.6) — must not be conflated with V3/V4
+    # instruct models. Source: DeepSeek-R1 README (api-docs.deepseek.com).
+    if "r1" in text or "reasoner" in text:
+        return "deepseek-r1-reasoner"
     if "v4" in text:
         return "deepseek-v4-reasoning"
     return "explicit-steps"

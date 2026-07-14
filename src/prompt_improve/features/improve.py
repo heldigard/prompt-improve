@@ -18,7 +18,7 @@ from prompt_improve.features.target import (
     target_guidance,
     target_profile_from_request,
 )
-from prompt_improve.shared import compat
+from prompt_improve.shared import compat, metrics
 from prompt_improve.shared.cache import load_cached, save_cached
 from prompt_improve.shared.config import (
     CLOUD_FALLBACK,
@@ -97,6 +97,7 @@ def _run_ollama_models(
         if cleaned:
             _debug(f"  model={model} OK ({len(cleaned)} chars)")
             save_cached(prompt, cache_mode, cleaned, f"ollama:{model}", cwd)
+            metrics.record("ollama")
             return cleaned, f"ollama:{model}"
         _debug(f"  model={model} cleaner rejected output")
     _debug(f"exhausted chain for role={role}")
@@ -145,6 +146,7 @@ def call_ollama(
     cache_mode = _cache_mode("clarify", target)
     cached = load_cached(prompt, cache_mode, cwd)
     if cached:
+        metrics.record("cache:hit")
         return cached
     system, user = _build_messages("clarify", prompt, cwd, target)
     messages = [{"role": "system", "content": system}, {"role": "user", "content": user}]
@@ -173,6 +175,7 @@ def call_ollama_rewrite(
     cache_mode = _cache_mode("rewrite", target)
     cached = load_cached(prompt, cache_mode, cwd)
     if cached:
+        metrics.record("cache:hit")
         return cached
     system, user = _build_messages("rewrite", prompt, cwd, target)
     messages = [{"role": "system", "content": system}, {"role": "user", "content": user}]
@@ -230,6 +233,7 @@ def call_cloud_cascade(
     if not text:
         return None
     model = (result.get("model") or "cloud") if isinstance(result, dict) else "cloud"
+    metrics.record("cloud")
     return text, f"cloud:{model}"
 
 

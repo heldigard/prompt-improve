@@ -103,12 +103,22 @@ def _variant_guidance(target: TargetProfile) -> str:
             "for long context, place the data/context first and anchor the final "
             "request after it with an explicit output format."
         )
-    if target.family == "deepseek" and "v4" in lower:
-        return (
-            "Version note: DeepSeek V4 is strong for coding and agentic reasoning; "
-            "keep externally visible steps numbered, specify the final answer "
-            "contract, and do not request hidden chain-of-thought."
-        )
+    if target.family == "deepseek":
+        if "r1" in lower or "reasoner" in lower:
+            return (
+                "Version note: DeepSeek-R1 / deepseek-reasoner is a pure reasoning "
+                "model. Put ALL instructions in the user message and do NOT use a "
+                "system prompt (it was trained without one). Prefer zero-shot — "
+                "avoid few-shot examples, which degrade its reasoning chain. Use "
+                "temperature 0.5-0.7 (0.6 recommended). Keep the prompt concise; "
+                "do not request visible chain-of-thought."
+            )
+        if "v4" in lower:
+            return (
+                "Version note: DeepSeek V4 is strong for coding and agentic reasoning; "
+                "keep externally visible steps numbered, specify the final answer "
+                "contract, and do not request hidden chain-of-thought."
+            )
     if target.family == "qwen" and ("qwen3" in lower or "qwen-3" in lower):
         return (
             "Version note: Qwen3 prompts should be self-contained and literal; "

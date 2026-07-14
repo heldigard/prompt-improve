@@ -132,3 +132,42 @@ def test_load_cached_rejects_corrupt_entry(monkeypatch, tmp_path):
 
     assert cmod.load_cached("some prompt", "rewrite") is None
     assert not path.exists(), "corrupt entry must be evicted so the next save can repopulate"
+
+
+def test_prune_over_capacity_drops_oldest(monkeypatch, tmp_path):
+    """When entries exceed the cap, the oldest (lowest mtime) are evicted first."""
+    import time as _time
+
+    import prompt_improve.shared.cache as cmod
+
+    monkeypatch.setattr(cmod, "CACHE_DIR", tmp_path)
+    now = _time.time()
+    for name, age in (("f0", 300), ("f1", 200), ("f2", 100)):
+        entry = tmp_path / f"{name}.json"
+        entry.write_text("{}", encoding="utf-8")
+        old = now - age
+        os.utime(entry, (old, old))
+
+    removed = cmod.prune_over_capacity(max_entries=2)
+
+    assert removed == 1
+    remaining = sorted(p.name for p in tmp_path.glob("*.json"))
+    assert remaining == ["f1.json", "f2.json"], "oldest entry (f0) must be evicted"
+
+
+def test_save_cached_prunes_over_capacity(monkeypatch, tmp_path):
+    """save_cached must enforce the entry cap, evicting the older entry when a
+    newer one pushes the count over CACHE_MAX_ENTRIES."""
+    import prompt_improve.shared.cache as cmod
+
+    monkeypatch.setattr(cmod, "CACHE_DIR", tmp_path)
+    monkeypatch.setattr(cmod, "CACHE_TTL_SECONDS", 300.0)
+    monkeypatch.setattr(cmod, "CACHE_MAX_ENTRIES", 1)
+
+    cmod.save_cached("prompt A", "rewrite", "a", "ollama:x")
+    cmod.save_cached("prompt B", "rewrite", "b", "ollama:x")
+
+    entries = list(tmp_path.glob("*.json"))
+    assert len(entries) == 1, "cap=1 must evict the older entry on the second save"
+    assert cmod.load_cached("prompt B", "rewrite") == ("b", "ollama:x")
+    assert cmod.load_cached("prompt A", "rewrite") is None

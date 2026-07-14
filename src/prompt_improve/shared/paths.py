@@ -304,11 +304,13 @@ def _ecosystem_skill_hint(prompt: str, language: str | None = None) -> str:
     """
     p = prompt.lower()
     if language is None:
-        spanish_indicators = r"\b(?:que|como|para|con|las?|los?|un?a?s?|es|son|del|en|revisa|crea|arregla|implementa|cómo|continuar|tarea)\b"
-        if re.search(spanish_indicators, p):
-            language = "Spanish"
-        else:
-            language = "English"
+        # Reuse the shared detector (accent + marker-word heuristics) instead of
+        # a local regex subset that missed accents and over-matched stopwords.
+        # Local import: detect.py imports paths at module top, so a module-level
+        # import here would cycle; by call time both modules are fully loaded.
+        from prompt_improve.features.detect import detect_language
+
+        language = detect_language(prompt)
 
     is_sp = language == "Spanish"
 

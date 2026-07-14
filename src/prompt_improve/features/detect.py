@@ -27,7 +27,8 @@ _CONVERSATION_CONTEXT_RE = re.compile(
 # English prompts containing request/query/unique/sequence ("que") as Spanish.
 _SPANISH_MARKER_RE = re.compile(
     r"\b(?:arregla|revisa|corrige|continua|implementa|mejora|mejorar|prueba|pruebas|"
-    r"casos|funcione|archivo|configuracion|configuración|seguridad|que|qué|como|cómo)\b",
+    r"casos|funcione|archivo|configuracion|configuración|seguridad|crea|crear|"
+    r"que|qué|como|cómo)\b",
     re.IGNORECASE,
 )
 

@@ -11,6 +11,7 @@ from pathlib import Path
 
 from prompt_improve.shared.config import (
     CACHE_DIR,
+    CACHE_MAX_ENTRIES,
     CACHE_SCHEMA_VERSION,
     CACHE_TTL_SECONDS,
 )
@@ -119,6 +120,7 @@ def save_cached(prompt: str, mode: str, text: str, source: str, cwd: str | None 
     except OSError:
         return
     prune_expired()
+    prune_over_capacity()
 
 
 def prune_expired(max_unlinks: int = 200) -> int:
@@ -143,4 +145,43 @@ def prune_expired(max_unlinks: int = 200) -> int:
             continue
         if removed >= max_unlinks:
             break
+    return removed
+
+
+def prune_over_capacity(max_entries: int | None = None) -> int:
+    """Drop oldest entries when the cache exceeds the entry-count cap.
+
+    TTL eviction only catches expired entries; a long TTL plus many distinct
+    prompts grows the on-disk cache without bound. This is the size bound: when
+    the entry count exceeds ``CACHE_MAX_ENTRIES``, evict the oldest (lowest
+    mtime) first — LRU-ish, since older entries are less likely to recur.
+    Bounded unlink count so a huge backlog cannot stall an interactive save.
+    """
+    cap = CACHE_MAX_ENTRIES if max_entries is None else max_entries
+    if cap <= 0:
+        return 0
+    try:
+        entries = list(CACHE_DIR.glob("*.json"))
+    except OSError:
+        return 0
+    if len(entries) <= cap:
+        return 0
+
+    def _mtime(entry: Path) -> float:
+        try:
+            return entry.stat().st_mtime
+        except OSError:
+            # On stat failure, keep the entry (sort as newest) rather than risk
+            # dropping a valid file we simply could not inspect.
+            return float("inf")
+
+    entries.sort(key=_mtime)
+    surplus = entries[: len(entries) - cap]
+    removed = 0
+    for entry in surplus:
+        try:
+            entry.unlink(missing_ok=True)
+            removed += 1
+        except OSError:
+            continue
     return removed

@@ -219,6 +219,42 @@ def test_try_improve_rewrite_fallback_to_clarify():
         cmd_mod.rule_based_suggestions = orig_rules
 
 
+def test_improve_and_emit_rules_fallback_is_treated_as_clarification(capsys):
+    """When rewrite degrades to rule-based suggestions (source='fallback:rules',
+    effective_mode='rewrite'), the output must NOT carry the rewrite/expansion
+    framing. Rewrite framing would mis-label suggestions as a 'work specification'
+    in hook mode and drop the user's original prompt in direct-CLI mode. Rules are
+    always clarify-style bullets, so they must be treated as clarification."""
+    import prompt_improve.command as cmd_mod
+
+    suggestions = "Suggestions to clarify the prompt:\n- Specify the affected file."
+    orig_try = cmd_mod._try_improve
+    cmd_mod._try_improve = lambda prompt, mode, cwd, target=None: (
+        suggestions,
+        "fallback:rules",
+        "rewrite",
+    )
+    try:
+        # Hook mode: additionalContext must use the clarify wrapper, not expansion.
+        cmd_mod._improve_and_emit("fix it", None, {}, direct_cli=False)
+        hook_out = json.loads(capsys.readouterr().out)
+        hook_ctx = hook_out["hookSpecificOutput"]["additionalContext"]
+        assert "Mejora de prompt" in hook_ctx
+        assert suggestions in hook_ctx
+        assert "Prompt expandido" not in hook_ctx
+        assert "especificación" not in hook_ctx.lower()
+
+        # Direct-CLI mode: the original prompt must be preserved (rewrite framing
+        # would print only the suggestions and lose the user's words).
+        cmd_mod._improve_and_emit("fix it", None, {}, direct_cli=True)
+        direct_out = capsys.readouterr().out
+        assert "fix it" in direct_out
+        assert suggestions in direct_out
+        assert "Prompt expandido" not in direct_out
+    finally:
+        cmd_mod._try_improve = orig_try
+
+
 def test_command_main_passthrough_on_no_improve_marker():
     """[NO_IMPROVE] bypasses everything — emits a bare continue=true."""
     out = _run_main_via_stdin("implement the feature", env={"NO_IMPROVE": "1"})

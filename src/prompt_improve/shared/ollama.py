@@ -74,8 +74,13 @@ def _launch_ollama_serve() -> subprocess.Popen | None:  # type: ignore[type-arg]
             start_new_session=True,
         )
     except OSError:
-        log.close()
         return None
+    finally:
+        # Popen has already inherited (and duplicated) the fd into the child at
+        # fork/exec; the parent's own handle is no longer needed. Closing it here
+        # avoids an fd leak + ResourceWarning while the detached daemon keeps
+        # writing to the log via its own copy of the descriptor.
+        log.close()
 
 
 def start_ollama_best_effort() -> bool:

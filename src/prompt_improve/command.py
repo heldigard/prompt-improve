@@ -16,6 +16,7 @@ from prompt_improve.features.hints import continuation_context
 from prompt_improve.features.improve import route_and_improve
 from prompt_improve.features.rules import rule_based_suggestions
 from prompt_improve.features.target import TargetProfile, target_profile_from_request
+from prompt_improve.shared import metrics
 
 
 def _passthrough() -> None:
@@ -138,6 +139,7 @@ def _improve_and_emit(prompt: str, cwd: str | None, data: dict | None, direct_cl
     # scope: unsolicited "clarification" can dilute a long, precise request
     # just as easily as a full rewrite can.
     if depends_on_conversation_context(prompt) or has_concrete_target(prompt):
+        metrics.record("passthrough:concrete")
         print(prompt) if direct_cli else _passthrough()
         return
 
@@ -145,10 +147,19 @@ def _improve_and_emit(prompt: str, cwd: str | None, data: dict | None, direct_cl
     improved, source, effective_mode = _try_improve(prompt, mode, cwd, target)
 
     if not improved:
+        metrics.record("passthrough:noimprove")
         print(prompt) if direct_cli else _passthrough()
         return
 
-    is_rewrite = source.startswith("memory:") or effective_mode == "rewrite"
+    metrics.record(source)
+
+    # Rule-based fallback always yields clarify-style bullets, never a structured
+    # rewrite spec. Labeling it as a rewrite would, in direct-CLI mode, drop the
+    # user's original prompt (printing only suggestions) and, in hook mode,
+    # mis-frame suggestions as a "work specification". Treat rules as clarification.
+    is_rewrite = (
+        source.startswith("memory:") or effective_mode == "rewrite"
+    ) and source != "fallback:rules"
     if direct_cli:
         print(_build_direct_output(prompt, improved, is_rewrite))
         return
@@ -182,15 +193,20 @@ def main() -> None:
         prompt = " ".join(sys.argv[1:]).strip()
         direct_cli = True
 
-    if _worker_opt_out(prompt) or not prompt or detect_trivial(prompt):
-        print(prompt) if direct_cli else _passthrough()
-        return
-
     try:
-        _improve_and_emit(prompt, cwd, data, direct_cli)
-    except Exception as exc:  # fail OPEN: the hook must never degrade prompt submission
-        print(f"[prompt-improve] unexpected error, passing through: {exc}", file=sys.stderr)
-        print(prompt) if direct_cli else _passthrough()
+        if _worker_opt_out(prompt) or not prompt or detect_trivial(prompt):
+            metrics.record("passthrough:trivial")
+            print(prompt) if direct_cli else _passthrough()
+            return
+
+        try:
+            _improve_and_emit(prompt, cwd, data, direct_cli)
+        except Exception as exc:  # fail OPEN: the hook must never degrade prompt submission
+            print(f"[prompt-improve] unexpected error, passing through: {exc}", file=sys.stderr)
+            metrics.record("error")
+            print(prompt) if direct_cli else _passthrough()
+    finally:
+        metrics.emit()
 
 
 if __name__ == "__main__":

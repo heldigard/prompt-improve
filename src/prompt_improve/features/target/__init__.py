@@ -19,6 +19,7 @@ from __future__ import annotations
 from prompt_improve.features.target.profile import (
     GENERIC_TARGET,
     TargetProfile,
+    profile_for_cli,
     profile_for_model,
     target_profile_from_request,
 )
@@ -27,6 +28,7 @@ from prompt_improve.features.target.shape import target_guidance
 __all__ = [
     "GENERIC_TARGET",
     "TargetProfile",
+    "profile_for_cli",
     "profile_for_model",
     "target_guidance",
     "target_profile_from_request",
