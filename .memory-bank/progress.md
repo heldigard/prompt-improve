@@ -1,5 +1,17 @@
 # Progress
 
+## 2026-07-14 (hardening + observability round)
+- 2026-07-14T23:09:01Z | status:completed | Second adversarial review via code-reviewer subagent found **0 real defects**: all 5 reported P1/medium were false positives, verified against Python semantics (`finally` DOES run on `return`; `Popen` does NOT close the parent handle; `os.replace` is atomic so readers never see `.tmp`) and against the e2e metrics test. No fixes applied from the review — my own independent analysis held.
+- Fix A (command.py): `is_rewrite` now excludes `source=="fallback:rules"`. Rewrite mode degrading to rule-based suggestions was mislabeled as rewrite — in direct-CLI mode it DROPPED the user's original prompt (printed only suggestions); in hook mode it mis-framed suggestions as a "work specification". Rules are always clarify-style bullets. +1 e2e test.
+- Fix B (test_target.py): two target-detection tests scrub env via `_scrub_target_env` helper (named vars + `CODEX_*`/`CLAUDE_CODE_*` prefixes). They were flaky under ANY proxy backend (`ANTHROPIC_MODEL=glm-5.2` + `CLAUDE_AGENT_IDENTITY=zai:...` won over the hook payload; a residual `CODEX_*` short-circuited `_cli_from_env_or_model` to 'codex'). Production behavior (model wins over CLI for shaping) unchanged and correct.
+- Fix E (ollama.py): `_launch_ollama_serve` closes the parent log handle in try/finally. The child inherits+duplicates the fd via `Popen(stdout=log)`, but the parent's own handle leaked (fd leak + ResourceWarning).
+- P1 (cache.py + config.py): `CACHE_MAX_ENTRIES` (env `OLLAMA_IMPROVE_CACHE_MAX_ENTRIES`, default 500) + `prune_over_capacity()` LRU eviction (oldest-by-mtime). TTL alone left the on-disk cache unbounded under long TTL + many distinct prompts. cap<=0 disables; stat-failure keeps the entry. +2 tests.
+- P2 (shared/metrics.py new): optional in-memory Counter (cache:hit / ollama / cloud fresh, passthrough:trivial|concrete|noimprove, error, source), emitted to stderr when `OLLAMA_IMPROVE_METRICS=1` (or DEBUG). `main()` wrapped in try/finally -> `metrics.emit()`. record() always tallies (cheap); emit() short-circuits unless enabled — the disabled hot path (the normal case) is untouched. +5 tests (4 unit + 1 e2e subprocess verifying the line).
+- P3 (profile.py): `PROMPT_IMPROVE_SHAPE_BY` env (model|cli, default model). `cli` shapes for the CLI family (Claude XML) even when a proxy routes to a different model underneath. `_CLI_FAMILY_STYLE` dict = single source of truth for cli->(family,style), refactor of profile_for_model's final branches to use it (DRY). +profile_for_cli. +1 test.
+- P4 (paths.py + detect.py): `_ecosystem_skill_hint` now uses `detect_language` (local import — avoids the paths<->detect module-level cycle; detect imports paths at module top) instead of a local regex subset that missed accents and over-matched stopwords. detect.py gained `crea|crear` markers (`\bcrea\b` does not collide with "create"). Covered by existing ecosystem tests.
+- Parallel user change included in the target commit: deepseek-r1/reasoner support — `_deepseek_style` style label (profile.py) + `_variant_guidance` version note (shape.py) for the pure-reasoning R1 model (no system prompt, zero-shot, temp 0.5-0.7).
+- Validation: pytest full suite 0 failures (180+ tests), ruff check + format clean, py_compile clean, metrics e2e subprocess verified.
+
 - 2026-07-11T20:12:00Z | status:completed | Cierre de sesión: se registró limpieza de ruido en memoria y estado de trabajo pendiente de push de hoy en repos asociados.
 
 ## 2026-07-05 (target-aware prompt profiles)
@@ -76,3 +88,4 @@
 - 2026-07-13T23:42:45Z | status:completed | session:24f2ee4f-ac49-4c6f-9cc7-5c99d60fb72b | gemini: None.
 
 
+- 2026-07-14T23:11:52Z | - 2026-07-14: DeepSeek-R1 reasoner detection + guidance landed (commit 9f211c6, pushed origin/main). _deepseek_style + _variant_guidance R1 branch + 2 tests. Bundle also committed the in-flight metrics instrumentation WIP (shared/metrics.py + wiring) per user decision 'commitear todo junto'. Full suite 210 passed; ruff/mypy clean.
