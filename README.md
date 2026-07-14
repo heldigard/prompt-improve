@@ -5,7 +5,7 @@ actionable prompts and only rewrites or clarifies genuinely underspecified input
 
 ## Features
 
-- **Role-based model routing**: `hf.co/TeichAI/Qwen3.5-9B-Fable-5-v1-GGUF` (evidence-fidelity #1) → `Jackrong/Negentropy-claude-opus-4.7-9B` → `SetneufPT/Qwopus3.5-4B-Coder-MTP` → `cryptidbleh/gemma4-claude-opus-4.6`. Override the whole chain via `OLLAMA_IMPROVE_MODELS`; per-role via `OLLAMA_IMPROVE_ROLE_PROMPT_REWRITE` / `OLLAMA_IMPROVE_ROLE_PROMPT_CLARIFY`
+- **Role-based model routing**: `cryptidbleh/gemma4-claude-opus-4.6` (evidence-fidelity #1, round-17 2026-07-13 fresh 5-way 2.97) → `TeichAI/Qwen3.5-9B-Fable-5-v1` (round-10 champion demoted to fallback, 2.46) → `Jackrong/Negentropy-claude-opus-4.7-9B` (round-7 held, 2.03) → `SetneufPT/Qwopus3.5-4B-Coder-MTP` (round-17 bench-validated, 1.68). Override the whole chain via `OLLAMA_IMPROVE_MODELS`; per-role via `OLLAMA_IMPROVE_ROLE_PROMPT_REWRITE` / `OLLAMA_IMPROVE_ROLE_PROMPT_CLARIFY`
 - **Target-aware prompt shaping**: detects the receiving CLI/model family and
   shapes the improved prompt in two dimensions — **format** (XML vs Markdown vs
   component blocks) and **behavior** (per-family failure-mode mitigations, e.g.

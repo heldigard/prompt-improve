@@ -56,19 +56,21 @@ OLLAMA_PID = os.path.expanduser("~/.ollama/ollama-serve.pid")
 # ---------------------------------------------------------------------------
 # Model candidates (global fallback)
 # ---------------------------------------------------------------------------
-# Default chain = round-10 2026-07-12 cross-task 4-way validation
-# (topics/candidates-round-10-2026-07-12.md). TeichAI/Fable-5-v1 dethroned
-# OmniCoder in improve (2.46 vs 0.93 in 4-way deep, +1.53), making it the
-# new evidence-fidelity champion. OmniCoder is no longer in the improve
-# chain — it's now depth-only (bug_finding/pdf_extract fallback). Negentropy
-# 9B is the round-7 fallback that held. SetneufPT provides coder-flavored
-# structural output as a tertiary. The available-model tail is appended at
-# runtime, so this is prioritization, not a hard dependency.
+# Default chain = round-17 2026-07-13 fresh 5-way deep validation
+# (topics/candidates-round-17-2026-07-13.md). cryptidbleh/gemma4-claude-opus-4.6
+# dethroned TeichAI/Fable-5-v1 in a 5-way re-bench (2.97 vs 2.46, +0.51), exposing
+# round-10's blind spot: cryptidbleh was the round-7 chain tail (legacy 2026-07-09
+# #1) but was NOT included in round-10's 4-way, so its strength was never
+# re-validated against TeichAI. TeichAI demoted to #2 fallback. Negentropy-9B held
+# at #3. SetneufPT held at #4 (now bench-validated, 1.68). OmniCoder removed
+# from improve chain (demoted to bug_finding/pdf_extract depth, scored 0.93).
+# The available-model tail is appended at runtime, so this is prioritization,
+# not a hard dependency.
 _DEFAULT_IMPROVE_CHAIN = (
+    "cryptidbleh/gemma4-claude-opus-4.6:latest,"
     "hf.co/TeichAI/Qwen3.5-9B-Fable-5-v1-GGUF:Q4_K_M,"
     "hf.co/Jackrong/Negentropy-claude-opus-4.7-9B-GGUF:Q4_K_M,"
-    "SetneufPT/Qwopus3.5-4B-Coder-MTP_Q4_64k_8GB-GPU:latest,"
-    "cryptidbleh/gemma4-claude-opus-4.6:latest"
+    "SetneufPT/Qwopus3.5-4B-Coder-MTP_Q4_64k_8GB-GPU:latest"
 )
 
 OLLAMA_MODEL_CANDIDATES = [

@@ -9,7 +9,7 @@ command -v ollama >/dev/null 2>&1 || exit 0
 LOG_DIR="$HOME/.ollama/logs"
 LOG_FILE="$LOG_DIR/ollama-serve.log"
 PID_FILE="$HOME/.ollama/ollama-serve.pid"
-MODEL="${OLLAMA_IMPROVE_WARM_MODEL:-hf.co/TeichAI/Qwen3.5-9B-Fable-5-v1-GGUF:Q4_K_M}" # keep in sync with _DEFAULT_IMPROVE_CHAIN primary (shared/config.py)
+MODEL="${OLLAMA_IMPROVE_WARM_MODEL:-cryptidbleh/gemma4-claude-opus-4.6:latest}" # keep in sync with _DEFAULT_IMPROVE_CHAIN primary (shared/config.py)
 
 mkdir -p "$LOG_DIR"
 

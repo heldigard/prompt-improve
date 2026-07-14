@@ -1,10 +1,12 @@
 # REFERENCE - Stable Facts
 
-## Model benchmarks (2026-07-09 fidelity re-bench, Ollama 0.31.2)
-- Active chain: **cryptidbleh/gemma4-claude-opus-4.6** (risk-weighted improve #1) → **Negentropy Claude Opus 4.7 9B** → **SetneufPT/Qwopus3.5-4B-Coder-MTP** → **OmniCoder-Qwen3.5-9B**.
+## Model benchmarks (round-10 2026-07-12 PM cross-task, Ollama 0.31.1; validated 2026-07-13 round-16)
+- Active chain: **hf.co/TeichAI/Qwen3.5-9B-Fable-5-v1-GGUF:Q4_K_M** (risk-weighted improve #1, 2.46 in 4-way deep, +1.53 over previous OmniCoder 0.93) → **hf.co/Jackrong/Negentropy-claude-opus-4.7-9B-GGUF:Q4_K_M** (2.03 fallback, held round-7) → **SetneufPT/Qwopus3.5-4B-Coder-MTP_Q4_64k_8GB-GPU:latest** (coder-flavored structural output) → **cryptidbleh/gemma4-claude-opus-4.6:latest** (legacy fidelity winner 2026-07-09, now tail).
+- OmniCoder-Qwen3.5-9B **demoted to bug_finding/pdf_extract depth** (no longer in improve chain).
 - Source of truth in code: `shared/config.py::_DEFAULT_IMPROVE_CHAIN`; missing models degrade gracefully through the available-model tail.
 - `OLLAMA_IMPROVE_MODELS` overrides the global chain; role-specific overrides take precedence for rewrite/clarify.
-- Superseded defaults include Grug-12B, pegasus912, Librellama/gemma4:e2b, qwen3.5:4b, Huihui-gemma-4-12B, and MobiusDevelopment/gemma-4-12B.
+- Round-16 (2026-07-13): Granite-4.1-8B tested (isolated signal 3.00, fresh 3-way replication 2.33 vs TeichAI 2.46 and Negentropy 2.03) → **rejected**, not added.
+- Superseded defaults include Grug-12B, pegasus912, Librellama/gemma4:e2b, qwen3.5:4b, Huihui-gemma-4-12B, MobiusDevelopment/gemma-4-12B, OmniCoder-Qwen3.5-9B (improve), Granite-4.1-8B (round-16 rejection), and Batiai/gemma4-e2b (smart_trim only).
 - Bench source of truth: **`~/ollama-bench/RANKING.md`** (the vertical-slice successor to the old `~/bench/ollama/`).
 
 ### Caveat: leak-detector coverage (RESOLVED 2026-07-04)
