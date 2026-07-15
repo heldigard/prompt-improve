@@ -200,3 +200,17 @@ def test_has_concrete_target_false_when_no_path_or_ext() -> None:
     assert has_concrete_target("fix it") is False
     assert has_concrete_target("update this thing") is False
     assert has_concrete_target("fix foo") is False
+
+
+def test_detect_trivial_slash_with_args() -> None:
+    """Slash-command with arguments is an actionable command — passthrough."""
+    from prompt_improve.features.detect import detect_trivial
+    assert detect_trivial("/commit the changes") is True
+    assert detect_trivial("/review src/foo.py") is True
+    assert detect_trivial("/plan add caching layer") is True
+
+
+def test_detect_trivial_bare_slash() -> None:
+    """Bare slash-commands still pass through (unchanged behavior)."""
+    from prompt_improve.features.detect import detect_trivial
+    assert detect_trivial("/commit") is True

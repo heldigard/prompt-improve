@@ -134,10 +134,16 @@ TASK_VERBS = (
 TASK_VERBS_RE = re.compile(rf"\b(?:{TASK_VERBS})\b")
 
 # ---------------------------------------------------------------------------
-# Concrete file/action patterns
-# ---------------------------------------------------------------------------
+# Concrete file patterns. Match either an extension right after a non-whitespace
+# char (absolute-style path) OR a leading `.`/`~/`/`/` to also catch relative,
+# home-relative, and module paths the original left as silent misses. Keep the
+# extension list stable so existing tests don't need to change character sets.
 _CONCRETE_FILE_RE = re.compile(
-    r"[^\s\"'`]\.(?:py|ts|tsx|js|jsx|mjs|cjs|java|go|rs|rb|kt|kts|cs|php|vue|svelte|"
+    r"(?:"
+    r"[^\s\"'`]"  # any non-whitespace, non-quote char before the dot
+    r"|[.~/]"  # OR a path-leading char (relative, home, absolute, dotfile)
+    r")"
+    r"\.(?:py|ts|tsx|js|jsx|mjs|cjs|java|go|rs|rb|kt|kts|cs|php|vue|svelte|"
     r"json|json5|ya?ml|toml|ini|cfg|conf|env|md|mdx|sh|bash|zsh|sql|tf|tfvars|"
     r"gradle|xml|html|htm|css|scss|proto|dockerfile)\b",
     re.IGNORECASE,
