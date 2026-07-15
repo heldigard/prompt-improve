@@ -88,6 +88,7 @@ def test_metrics_persists_jsonl_when_enabled(tmp_path, monkeypatch) -> None:
     monkeypatch.setenv("OLLAMA_IMPROVE_METRICS_PERSIST", "1")
     monkeypatch.setenv("OLLAMA_IMPROVE_METRICS_DIR", str(tmp_path))
     from prompt_improve.shared import metrics
+
     metrics._counts.clear()
     metrics.record("ollama")
     metrics.record("cache:hit")
@@ -96,8 +97,6 @@ def test_metrics_persists_jsonl_when_enabled(tmp_path, monkeypatch) -> None:
     assert target.exists()
     line = target.read_text().strip()
     assert "ollama" in line and "cache:hit" in line
-    # Verify it parses as JSON.
-    import json
     rec = json.loads(line)
     assert rec["counts"]["ollama"] == 1
 
@@ -107,6 +106,7 @@ def test_metrics_silent_when_disabled(tmp_path, monkeypatch, capsys) -> None:
     monkeypatch.delenv("OLLAMA_IMPROVE_METRICS_PERSIST", raising=False)
     monkeypatch.delenv("OLLAMA_IMPROVE_DEBUG", raising=False)
     from prompt_improve.shared import metrics
+
     metrics._counts.clear()
     metrics.record("ollama")
     metrics.emit()
