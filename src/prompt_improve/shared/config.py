@@ -47,7 +47,7 @@ OLLAMA_URL = normalize_ollama_url(
     )
 )
 OLLAMA_TIMEOUT = _positive_finite_float(os.environ.get("OLLAMA_IMPROVE_TIMEOUT"), 45.0)
-OLLAMA_TOTAL_TIMEOUT = _positive_finite_float(os.environ.get("OLLAMA_IMPROVE_TOTAL_TIMEOUT"), 24.0)
+OLLAMA_TOTAL_TIMEOUT = _positive_finite_float(os.environ.get("OLLAMA_IMPROVE_TOTAL_TIMEOUT"), 20.0)
 OLLAMA_AUTOSTART = os.environ.get("OLLAMA_IMPROVE_AUTOSTART", "1") != "0"
 CLOUD_FALLBACK = os.environ.get("OLLAMA_IMPROVE_CLOUD_FALLBACK", "1") != "0"
 OLLAMA_LOG = os.path.expanduser("~/.ollama/logs/ollama-serve.log")

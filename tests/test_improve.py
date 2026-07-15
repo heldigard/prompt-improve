@@ -100,12 +100,12 @@ def test_route_hard_prompt_prefers_cloud():
     orig_local = m.call_ollama_rewrite
     m.needs_cloud_intelligence = lambda _p, _mode: True
 
-    def cloud(_p, _mode, _cwd=None, cloud_model=None, target=None):
+    def cloud(_p, _mode, _cwd=None, cloud_model=None, target=None, deadline=None):
         captured["cloud_model"] = cloud_model
         calls["cloud"] += 1
         return ("CLOUD", "cloud:deepseek-v4-flash")
 
-    def local_rw(_p, _cwd=None, target=None):
+    def local_rw(_p, _cwd=None, target=None, deadline=None):
         calls["local"] += 1
         return None
 
@@ -134,11 +134,11 @@ def test_route_simple_prompt_prefers_local():
     m.needs_cloud_intelligence = lambda _p, _mode: False
     calls = {"cloud": 0, "local": 0}
 
-    def local_rw(_p, _cwd=None, target=None):
+    def local_rw(_p, _cwd=None, target=None, deadline=None):
         calls["local"] += 1
         return ("LOCAL", "ollama:batiai/gemma4-12b:q4")
 
-    def cloud(_p, _mode, _cwd=None, cloud_model=None, target=None):
+    def cloud(_p, _mode, _cwd=None, cloud_model=None, target=None, deadline=None):
         calls["cloud"] += 1
         return None
 
@@ -164,10 +164,10 @@ def test_route_local_down_falls_back_to_cloud():
     orig_local = m.call_ollama_rewrite
     m.needs_cloud_intelligence = lambda p, mode: False
 
-    def local_rw(_p, _cwd=None, target=None):
+    def local_rw(_p, _cwd=None, target=None, deadline=None):
         return None
 
-    def cloud(_p, _mode, _cwd=None, cloud_model=None, target=None):
+    def cloud(_p, _mode, _cwd=None, cloud_model=None, target=None, deadline=None):
         return ("CLOUD-FALLBACK", "cloud:ling-2.6-1t")
 
     m.call_ollama_rewrite = local_rw
@@ -502,6 +502,61 @@ def test_fallback_chain_respects_total_latency_budget():
     assert calls == ["primary_model"]
 
 
+def test_unexpected_ollama_client_error_falls_through():
+    mod, calls, saved, _ReqErr, _Unavail, fake_chat = _patch_runner()
+    cast(Any, fake_chat)._next = _seq_responder([RuntimeError("response parser drift")])
+    try:
+        result = mod.call_ollama_rewrite("haz el dashboard mas rapido", cwd=None)
+    finally:
+        _restore(mod, saved)
+
+    assert result is None
+    assert calls == ["primary_model"]
+
+
+def test_cloud_cascade_clamps_timeout_to_shared_deadline(monkeypatch):
+    import prompt_improve.features.improve as mod
+
+    captured: dict[str, float] = {}
+
+    def fake_complete(**kwargs):
+        captured["timeout_total"] = kwargs["timeout_total"]
+        return {
+            "text": "Task: Fix the bug.\nAcceptance criteria: run the focused tests.",
+            "model": "cloud-test",
+        }
+
+    monkeypatch.setattr(mod.compat, "cheap_complete", fake_complete)
+    monkeypatch.setattr(mod, "CLOUD_FALLBACK", True)
+    monkeypatch.setattr(mod, "monotonic", lambda: 100.0)
+
+    result = mod.call_cloud_cascade("fix the bug", "rewrite", deadline=104.0)
+
+    assert result is not None
+    assert captured["timeout_total"] == 4.0
+
+
+def test_route_shares_one_deadline_across_local_and_cloud(monkeypatch):
+    import prompt_improve.features.improve as mod
+
+    deadlines: list[float | None] = []
+
+    def local(_p, _cwd=None, target=None, deadline=None):
+        deadlines.append(deadline)
+        return None
+
+    def cloud(_p, _mode, _cwd=None, cloud_model=None, target=None, deadline=None):
+        deadlines.append(deadline)
+        return None
+
+    monkeypatch.setattr(mod, "needs_cloud_intelligence", lambda _p, _m: False)
+    monkeypatch.setattr(mod, "call_ollama_rewrite", local)
+    monkeypatch.setattr(mod, "call_cloud_cascade", cloud)
+
+    assert mod.route_and_improve("fix it", "rewrite", None, deadline=123.0) is None
+    assert deadlines == [123.0, 123.0]
+
+
 def test_cloud_cascade_does_not_swallow_programmer_errors():
     """Regression 2026-07-04: narrow exception list must NOT catch NameError /
     AttributeError. Those are programmer bugs that should surface, not silently
@@ -577,7 +632,7 @@ def test_route_hard_prompt_cloud_model_env_override(monkeypatch):
     m.needs_cloud_intelligence = lambda _p, _mode: True
     monkeypatch.setenv("OLLAMA_IMPROVE_CLOUD_MODEL", "openai/gpt-5.6-mini")
 
-    def cloud(_p, _mode, _cwd=None, cloud_model=None, target=None):
+    def cloud(_p, _mode, _cwd=None, cloud_model=None, target=None, deadline=None):
         captured["cloud_model"] = cloud_model
         return ("CLOUD", "cloud:gpt-5.6-mini")
 

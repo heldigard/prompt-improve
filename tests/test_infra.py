@@ -12,6 +12,8 @@ import pytest
 from tests import compat as ip
 
 EVALS = Path(__file__).resolve().parent.parent / "evals" / "prompt-improve.json"
+CANONICAL_SHIM = Path(__file__).resolve().parent.parent / "prompt-improve.py"
+LIVE_SHIM = Path.home() / ".claude" / "hooks" / "prompt-improve.py"
 
 
 def _ollama_available() -> bool:
@@ -79,6 +81,13 @@ def test_package_import_surface_stable():
     assert callable(profile_for_model)
     assert callable(target_guidance)
     assert callable(target_profile_from_request)
+
+
+def test_live_shim_matches_tracked_source():
+    """The wired shim must not drift from the repository source of truth."""
+    if not LIVE_SHIM.exists():
+        pytest.skip("live Claude shim is absent in CI")
+    assert LIVE_SHIM.read_bytes() == CANONICAL_SHIM.read_bytes()
 
 
 def test_launch_ollama_serve_returns_none_when_log_dir_fails():

@@ -12,6 +12,7 @@ _TARGET_SCRUB_VARS = (
     "PROMPT_IMPROVE_TARGET_CLI",
     "CODEX_TARGET_CLI",
     "CLAUDE_TARGET_CLI",
+    "CLI_ORCHESTRATION_CALLER",
     "PROMPT_IMPROVE_TARGET_MODEL",
     "ANTHROPIC_MODEL",
     "ANTHROPIC_BASE_URL",
@@ -160,6 +161,22 @@ def test_target_profile_detects_claude_code_without_model_metadata(monkeypatch):
     target = target_profile_from_request({"hook_event_name": "UserPromptSubmit"})
     assert target.cli == "claude"
     assert target.family == "claude"
+
+
+def test_target_profile_uses_orchestration_pipeline_caller(monkeypatch):
+    from prompt_improve.features.target import target_profile_from_request
+
+    _scrub_target_env(monkeypatch)
+    for caller, family in (
+        ("claude", "claude"),
+        ("codex", "openai-gpt"),
+        ("gemini", "gemini"),
+        ("antigravity", "gemini"),
+    ):
+        monkeypatch.setenv("CLI_ORCHESTRATION_CALLER", caller)
+        target = target_profile_from_request({"hook_event_name": "UserPromptSubmit"})
+        assert target.cli == caller
+        assert target.family == family
 
 
 def test_target_profile_detects_claude_from_native_hook_payload(monkeypatch):

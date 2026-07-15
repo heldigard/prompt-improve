@@ -150,7 +150,7 @@ print(json.dumps({
     assert json.loads(result.stdout) == {
         "url": DEFAULT_OLLAMA_URL,
         "timeout": 45.0,
-        "total": 24.0,
+        "total": 20.0,
         "ttl": 300.0,
         "threshold": 260,
     }

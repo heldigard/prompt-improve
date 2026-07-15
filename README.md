@@ -37,7 +37,8 @@ cd ~/prompt-improve && python3 -m pytest tests/ -q
 ## How it works
 
 The hook fires on every user prompt via `~/.claude/settings.json` (UserPromptSubmit)
-and can also be called directly as `python3 ~/.claude/hooks/prompt-improve.py "prompt"`.
+through `user-prompt-pipeline.py` and can also be called directly as
+`python3 ~/.claude/hooks/prompt-improve.py "prompt"`.
 It first passes through prompts that already name a path/repository or explicit
 outcome. For genuinely underspecified prompts it selects a local model and either:
 - **Rewrites** short/vague prompts (<260 chars) into structured specs
@@ -56,7 +57,7 @@ the hook from loading.
 | Variable | Default | Accepted values |
 |---|---:|---|
 | `OLLAMA_IMPROVE_TIMEOUT` | `45.0` | Positive finite seconds per primary model attempt |
-| `OLLAMA_IMPROVE_TOTAL_TIMEOUT` | `24.0` | Positive finite seconds shared by local fallbacks |
+| `OLLAMA_IMPROVE_TOTAL_TIMEOUT` | `20.0` | Positive finite seconds shared by the whole cloud/local and rewrite/clarify attempt |
 | `OLLAMA_IMPROVE_CACHE_TTL` | `300.0` | Finite seconds; `0` or a negative value disables caching |
 | `OLLAMA_IMPROVE_REWRITE_THRESHOLD` | `260` | Positive base-10 character count |
 | `OLLAMA_URL` | client default or `http://127.0.0.1:11434` | HTTP loopback URL (`localhost`, `127.0.0.1`, or `::1`) |
@@ -78,7 +79,8 @@ agent/model that will receive it. Each family gets **three layers** of guidance:
 | **Codex / OpenAI GPT** | Markdown sections, backticked identifiers, no XML | Outcome-first contract: FILES / CONTRACT / CONSTRAINTS / EVIDENCE / ACCEPTANCE |
 | **Antigravity / Gemini** | Component blocks (Objective/Instructions/Context/Output format) | Long context in its own block (avoids focus dilution) |
 | **Qwen** | Numbered Markdown, exact paths/flags | Never retry a failed command as-is — change a flag or inspect the error |
-| **DeepSeek** | Numbered deterministic steps | Reasoning model — define visible steps/final contract; do not request hidden CoT |
+| **DeepSeek V3/V4** | Numbered deterministic steps | Instruct/agentic model — define visible steps and final contract |
+| **DeepSeek R1/reasoner** | Concise zero-shot user prompt; no system prompt | Do not request visible/hidden CoT or add few-shot examples |
 | **GLM (Z.AI)** | Numbered Markdown, inline env | Persist PATH/env inline per command (GLM loses env across shell calls) |
 | **MiniMax** | Agentic Markdown, definition of done | Deliver a minimal first artifact immediately (avoids exploration loop) |
 | **Kimi** | Agentic Markdown, single-agent | Don't delegate to subagents (Kimi forces its model on all subagents) |
@@ -97,9 +99,23 @@ For Codex wrappers, setting `PROMPT_IMPROVE_TARGET_CLI=codex` and
 Native Claude Code hooks are recognized from their `transcript_path` payload
 field even when active-model metadata is absent. `CLAUDECODE` / `CLAUDE_CODE_*`
 remain wrapper fallbacks.
-The local fallback chain shares a 24-second wall-clock budget by default
-(`OLLAMA_IMPROVE_TOTAL_TIMEOUT`) so a cold or rejected model cannot multiply
-interactive hook latency across every fallback.
+The complete improvement attempt shares a 20-second wall-clock budget by default
+(`OLLAMA_IMPROVE_TOTAL_TIMEOUT`) across cloud/local routing and the optional
+rewrite→clarify retry. This remains below the pipeline child's 22-second ceiling,
+so failure can still reach deterministic rules instead of being killed mid-call.
+
+## Diagnostic CLI
+
+```bash
+prompt-improve detect --prompt "fix foo.py"
+prompt-improve classify --prompt "audit the auth design" --mode rewrite
+prompt-improve target
+prompt-improve improve --prompt "continua" --cwd "$PWD"
+```
+
+The installed command and `python -m prompt_improve.cli` share the same
+subcommands. `improve` uses the hook's deterministic continuation and
+rewrite→clarify fallback path rather than a separate approximation.
 
 ### Architecture (`features/target/`)
 

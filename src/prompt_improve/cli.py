@@ -30,14 +30,13 @@ def _cmd_improve(args: argparse.Namespace) -> int:
     Mirrors what the hook does in additionalContext mode, but prints to stdout
     so the user can audit the rewrite output before the controller sees it.
     """
+    from prompt_improve.command import _try_improve
     from prompt_improve.features.detect import (
         decide_mode,
         depends_on_conversation_context,
         detect_trivial,
         has_concrete_target,
     )
-    from prompt_improve.features.improve import route_and_improve
-    from prompt_improve.features.rules import rule_based_suggestions
     from prompt_improve.features.target import target_profile_from_request
     from prompt_improve.shared import metrics
 
@@ -45,45 +44,44 @@ def _cmd_improve(args: argparse.Namespace) -> int:
     cwd = args.cwd
     data: dict | None = {"prompt": prompt, "cwd": cwd} if cwd else {"prompt": prompt}
 
-    if detect_trivial(prompt):
-        print(json.dumps({"status": "trivial", "prompt": prompt}, ensure_ascii=False))
-        return 0
-    if depends_on_conversation_context(prompt) or has_concrete_target(prompt):
-        print(
-            json.dumps(
-                {"status": "passthrough", "reason": "concrete/anaphoric"},
-                ensure_ascii=False,
+    try:
+        if detect_trivial(prompt):
+            metrics.record("passthrough:trivial")
+            print(json.dumps({"status": "trivial", "prompt": prompt}, ensure_ascii=False))
+            return 0
+        if depends_on_conversation_context(prompt) or has_concrete_target(prompt):
+            metrics.record("passthrough:concrete")
+            print(
+                json.dumps(
+                    {"status": "passthrough", "reason": "concrete/anaphoric"},
+                    ensure_ascii=False,
+                )
             )
-        )
-        return 0
+            return 0
 
-    mode = args.mode or decide_mode(prompt)
-    target = target_profile_from_request(data)
-    result = route_and_improve(prompt, mode, cwd, target)
-    if not result:
-        fallback = rule_based_suggestions(prompt)
+        mode = args.mode or decide_mode(prompt)
+        target = target_profile_from_request(data)
+        improved, source, effective_mode = _try_improve(prompt, mode, cwd, target)
+        if not improved:
+            metrics.record("passthrough:noimprove")
+            print(json.dumps({"status": "no-improvement", "mode": mode}, ensure_ascii=False))
+            return 0
+
+        metrics.record(source)
         print(
             json.dumps(
                 {
-                    "status": "fallback",
-                    "source": "rules",
-                    "mode": mode,
-                    "improved": fallback,
+                    "status": "fallback" if source == "fallback:rules" else "improved",
+                    "source": source,
+                    "mode": effective_mode,
+                    "improved": improved,
                 },
                 ensure_ascii=False,
             )
         )
         return 0
-
-    improved, source = result
-    print(
-        json.dumps(
-            {"status": "improved", "source": source, "mode": mode, "improved": improved},
-            ensure_ascii=False,
-        )
-    )
-    metrics.emit()
-    return 0
+    finally:
+        metrics.emit()
 
 
 def _cmd_classify(args: argparse.Namespace) -> int:

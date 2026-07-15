@@ -56,6 +56,7 @@ def target_profile_from_request(data: dict | None = None) -> TargetProfile:
         os.environ.get("PROMPT_IMPROVE_TARGET_CLI"),
         os.environ.get("CODEX_TARGET_CLI"),
         os.environ.get("CLAUDE_TARGET_CLI"),
+        os.environ.get("CLI_ORCHESTRATION_CALLER"),
         data.get("cli"),
         data.get("client"),
         data.get("tool"),

@@ -200,7 +200,10 @@ def test_try_improve_rewrite_fallback_to_clarify():
     cmd_mod.continuation_context = lambda p, c: None
     call_count = {"n": 0}
 
-    def fake_route(prompt, mode, cwd, target=None):
+    deadlines: list[float | None] = []
+
+    def fake_route(prompt, mode, cwd, target=None, deadline=None):
+        deadlines.append(deadline)
         call_count["n"] += 1
         if mode == "rewrite":
             return None
@@ -213,6 +216,7 @@ def test_try_improve_rewrite_fallback_to_clarify():
         assert result[0] == "clarified result"
         assert result[2] == "clarify"  # effective_mode fell back
         assert call_count["n"] == 2  # rewrite then clarify
+        assert deadlines[0] == deadlines[1]
     finally:
         cmd_mod.route_and_improve = orig_route
         cmd_mod.continuation_context = orig_cont
@@ -297,7 +301,11 @@ def test_command_main_falls_through_when_no_model_available():
     orig = cmd.route_and_improve
 
     def dummy_route_and_improve(
-        prompt: str, mode: str, cwd: str | None, target: Any = None
+        prompt: str,
+        mode: str,
+        cwd: str | None,
+        target: Any = None,
+        deadline: float | None = None,
     ) -> tuple[str, str] | None:
         return None
 
@@ -333,7 +341,7 @@ def test_command_main_emits_additional_context_on_rewrite():
     hookSpecificOutput.additionalContext (NOT a user-facing question)."""
     import prompt_improve.command as cmd
 
-    def fake_route(_prompt, _mode, _cwd=None, target=None):
+    def fake_route(_prompt, _mode, _cwd=None, target=None, deadline=None):
         return ("Tarea: Hacer X.\n\nContexto: y.", "ollama:fake", "rewrite")
 
     orig = cmd.route_and_improve
@@ -355,7 +363,7 @@ def test_command_main_direct_cli_outputs_plain_improved_prompt():
     """Direct enhance/argv mode emits text for shell wrappers, not hook JSON."""
     import prompt_improve.command as cmd
 
-    def fake_route(_prompt, _mode, _cwd=None, target=None):
+    def fake_route(_prompt, _mode, _cwd=None, target=None, deadline=None):
         return ("Task: Implement X.", "ollama:fake")
 
     orig = cmd.route_and_improve

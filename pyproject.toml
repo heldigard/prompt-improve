@@ -30,8 +30,9 @@ test = ["pytest>=8", "pytest-cov>=5", "ruff>=0.6"]
 [project.scripts]
 prompt-improve = "prompt_improve.command:main"
 
-# The hook path remains wired via `python3 ~/.claude/hooks/prompt-improve.py`.
-# The console script makes the graduated package directly callable too.
+# The hook path remains wired through the UserPromptSubmit pipeline at
+# `~/.claude/hooks/prompt-improve.py`. The console script also dispatches the
+# diagnostic subcommands implemented in `prompt_improve.cli`.
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

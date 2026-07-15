@@ -49,6 +49,7 @@ def _run_ollama_models(
     num_ctx: int,
     timeout_first: float,
     timeout_fallback: float,
+    deadline: float | None = None,
 ) -> tuple[str, str] | None:
     """Try role-specific Ollama models in order. Returns (cleaned, source) or None."""
     if compat.ollama_client is None:
@@ -64,11 +65,11 @@ def _run_ollama_models(
     # the cap rarely truncates a preferred model.
     models = ([primary] + fallbacks)[:6]
     _debug(f"role={role} chain={[m.split(':')[0] for m in models]}")
-    started = monotonic()
+    deadline = deadline if deadline is not None else monotonic() + OLLAMA_TOTAL_TIMEOUT
     for index, model in enumerate(models):
-        remaining = OLLAMA_TOTAL_TIMEOUT - (monotonic() - started)
+        remaining = deadline - monotonic()
         if remaining < 0.1:
-            _debug(f"role={role} exhausted {OLLAMA_TOTAL_TIMEOUT:.1f}s total budget")
+            _debug(f"role={role} exhausted shared improvement budget")
             break
         per_model_timeout = timeout_first if index == 0 else timeout_fallback
         timeout = min(per_model_timeout, remaining)
@@ -89,6 +90,12 @@ def _run_ollama_models(
             continue
         except compat.ollama_client.OllamaUnavailable:
             _debug("daemon down, aborting chain")
+            return None
+        except Exception as exc:
+            # The optional helper evolves independently. An unexpected
+            # transport/response exception must degrade to cloud/rules rather
+            # than abort the whole UserPromptSubmit pipeline.
+            _debug(f"ollama client error ({type(exc).__name__}), aborting local chain")
             return None
         if not content:
             _debug(f"  model={model} returned empty")
@@ -140,6 +147,7 @@ def call_ollama(
     prompt: str,
     cwd: str | None = None,
     target: TargetProfile | None = None,
+    deadline: float | None = None,
 ) -> tuple[str, str] | None:
     """Clarify mode: 1-3 action bullets via Ollama."""
     target = target or target_profile_from_request()
@@ -162,6 +170,7 @@ def call_ollama(
         num_ctx=16384,
         timeout_first=OLLAMA_TIMEOUT,
         timeout_fallback=min(OLLAMA_TIMEOUT, 30.0),
+        deadline=deadline,
     )
 
 
@@ -169,6 +178,7 @@ def call_ollama_rewrite(
     prompt: str,
     cwd: str | None = None,
     target: TargetProfile | None = None,
+    deadline: float | None = None,
 ) -> tuple[str, str] | None:
     """Rewrite mode: short/vague prompt → structured spec via Ollama."""
     target = target or target_profile_from_request()
@@ -194,6 +204,7 @@ def call_ollama_rewrite(
         num_ctx=8192,
         timeout_first=OLLAMA_TIMEOUT,
         timeout_fallback=min(OLLAMA_TIMEOUT, 30.0),
+        deadline=deadline,
     )
 
 
@@ -203,10 +214,16 @@ def call_cloud_cascade(
     cwd: str | None = None,
     cloud_model: str | None = None,
     target: TargetProfile | None = None,
+    deadline: float | None = None,
 ) -> tuple[str, str] | None:
     """Cloud via cheap_llm cascade (cross-provider failover)."""
     if not CLOUD_FALLBACK or compat.cheap_complete is None:
         _debug("cloud cascade disabled or cheap_llm unavailable")
+        return None
+    deadline = deadline if deadline is not None else monotonic() + OLLAMA_TOTAL_TIMEOUT
+    remaining = deadline - monotonic()
+    if remaining < 0.1:
+        _debug("cloud cascade skipped: shared improvement budget exhausted")
         return None
     target = target or target_profile_from_request()
     system, user = _build_messages(mode, prompt, cwd, target)
@@ -215,7 +232,7 @@ def call_cloud_cascade(
             system=system,
             prompt=user,
             schema_hint=None,
-            timeout_total=45.0 if cloud_model else 15.0,
+            timeout_total=min(45.0 if cloud_model else 15.0, remaining),
             prefer_local=False,
             require_json=False,
             cloud_model=cloud_model,
@@ -242,8 +259,10 @@ def route_and_improve(
     mode: str,
     cwd: str | None,
     target: TargetProfile | None = None,
+    deadline: float | None = None,
 ) -> tuple[str, str] | None:
     """Intelligent model router: hard → cloud first, else local first; cloud as availability fallback."""
+    deadline = deadline if deadline is not None else monotonic() + OLLAMA_TOTAL_TIMEOUT
     target = target or target_profile_from_request()
     if needs_cloud_intelligence(prompt, mode):
         # Read at call time (like the classifier's toggle) so tests and shell
@@ -258,17 +277,18 @@ def route_and_improve(
             cwd,
             cloud_model=cloud_model,
             target=target,
+            deadline=deadline,
         )
         if result:
             return result
         _debug("cloud-first failed, falling back to local")
     _debug(f"trying local ({mode})")
     result = (
-        call_ollama_rewrite(prompt, cwd, target)
+        call_ollama_rewrite(prompt, cwd, target, deadline=deadline)
         if mode == "rewrite"
-        else call_ollama(prompt, cwd, target)
+        else call_ollama(prompt, cwd, target, deadline=deadline)
     )
     if result:
         return result
     _debug("local unavailable, trying cloud availability fallback")
-    return call_cloud_cascade(prompt, mode, cwd, target=target)
+    return call_cloud_cascade(prompt, mode, cwd, target=target, deadline=deadline)

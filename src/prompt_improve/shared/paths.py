@@ -42,6 +42,29 @@ _COMPLETED_HEADING_RE = re.compile(
 _CHECKED_TASK_RE = re.compile(r"^\s*[-*]\s+\[[xX]\]\s+")
 _UNCHECKED_TASK_RE = re.compile(r"^\s*[-*]\s+\[\s\]\s+")
 _HOME_PATH_RE = re.compile(r"~/[^\s`'\"<>|]+")
+_MAX_MEMORY_HINT_BYTES = 64_000
+
+
+def _read_bounded_bank_text(
+    path: Path,
+    allowed_root: Path,
+    max_bytes: int = _MAX_MEMORY_HINT_BYTES,
+) -> str | None:
+    """Read one memory-bank file only when contained and reasonably sized."""
+    try:
+        if allowed_root.is_symlink():
+            return None
+        root = allowed_root.resolve(strict=True)
+        resolved = path.resolve(strict=True)
+        if (
+            not resolved.is_relative_to(root)
+            or not resolved.is_file()
+            or resolved.stat().st_size > max_bytes
+        ):
+            return None
+        return resolved.read_text(encoding="utf-8", errors="ignore")
+    except (OSError, RuntimeError, ValueError):
+        return None
 
 
 def _load_project_memory() -> Any:
@@ -62,10 +85,10 @@ def _load_project_memory() -> Any:
 
 
 def _filtered_current_task_text(path: Path) -> str:
-    try:
-        lines = path.read_text(encoding="utf-8", errors="ignore").splitlines()
-    except OSError:
+    text = _read_bounded_bank_text(path, path.parent)
+    if text is None:
         return ""
+    lines = text.splitlines()
     helper = _load_project_memory()
     if helper is not None and hasattr(helper, "filter_lines_for_injection"):
         try:
@@ -234,10 +257,10 @@ def _topic_hint(prompt: str, root: Path, max_scan: int = 40) -> str:
     demand if the overlap is relevant).
     """
     idx = root / ".memory-bank" / "topics" / "_index.md"
-    try:
-        lines = idx.read_text(encoding="utf-8", errors="ignore").splitlines()[:max_scan]
-    except OSError:
+    text = _read_bounded_bank_text(idx, root / ".memory-bank")
+    if text is None:
         return ""
+    lines = text.splitlines()[:max_scan]
     prompt_tokens = _tokenize_for_topic(prompt)
     if not prompt_tokens:
         return ""

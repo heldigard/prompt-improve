@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 import os
 import sys
+from time import monotonic
 
 from prompt_improve.features.detect import (
     decide_mode,
@@ -17,6 +18,7 @@ from prompt_improve.features.improve import route_and_improve
 from prompt_improve.features.rules import rule_based_suggestions
 from prompt_improve.features.target import TargetProfile, target_profile_from_request
 from prompt_improve.shared import metrics
+from prompt_improve.shared.config import OLLAMA_TOTAL_TIMEOUT
 
 
 def _passthrough() -> None:
@@ -57,12 +59,13 @@ def _try_improve(
             return deterministic, "memory:currentTask", "rewrite"
 
     target = target or target_profile_from_request()
-    result = route_and_improve(prompt, mode, cwd, target)
+    deadline = monotonic() + OLLAMA_TOTAL_TIMEOUT
+    result = route_and_improve(prompt, mode, cwd, target, deadline=deadline)
     if result:
         return result[0], result[1], mode
 
     if mode == "rewrite":
-        result = route_and_improve(prompt, "clarify", cwd, target)
+        result = route_and_improve(prompt, "clarify", cwd, target, deadline=deadline)
         if result:
             return result[0], result[1], "clarify"
 
@@ -90,6 +93,11 @@ def _handle_cli_flags() -> bool:
         print("Options:")
         print("  -v, --version  Show version")
         print("  -h, --help     Show this help message")
+        return True
+    if first_arg in {"improve", "classify", "detect", "target"}:
+        from prompt_improve.cli import main as cli_main
+
+        cli_main(sys.argv[1:])
         return True
     return False
 

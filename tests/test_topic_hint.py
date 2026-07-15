@@ -47,6 +47,32 @@ def test_topic_hint_matches_on_keyword_overlap(tmp_path: Path) -> None:
     assert out == "topic=auth-flow (Auth Flow)"
 
 
+def test_topic_hint_rejects_index_symlink_outside_bank(tmp_path: Path) -> None:
+    bank = tmp_path / ".memory-bank"
+    topics = bank / "topics"
+    topics.mkdir(parents=True)
+    outside = tmp_path / "outside-index.md"
+    outside.write_text(
+        "## Topics\n- [Sensitive Auth](auth.md) — auth token lifecycle\n",
+        encoding="utf-8",
+    )
+    (topics / "_index.md").symlink_to(outside)
+
+    assert _topic_hint("auth token lifecycle", tmp_path) == ""
+
+
+def test_topic_hint_rejects_oversized_index(tmp_path: Path) -> None:
+    bank = tmp_path / ".memory-bank"
+    topics = bank / "topics"
+    topics.mkdir(parents=True)
+    (topics / "_index.md").write_text(
+        "## Topics\n- [Auth](auth.md) — auth token\n" + ("x" * 64_001),
+        encoding="utf-8",
+    )
+
+    assert _topic_hint("auth token", tmp_path) == ""
+
+
 def test_topic_hint_empty_when_only_stopword_overlap(tmp_path: Path) -> None:
     bank = tmp_path / ".memory-bank"
     bank.mkdir()

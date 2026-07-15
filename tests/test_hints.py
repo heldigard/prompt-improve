@@ -27,6 +27,47 @@ def test_project_hint_reads_currenttask():
         assert "Refactor the billing service" in hint
 
 
+def test_project_hint_rejects_currenttask_symlink_outside_bank(tmp_path: Path):
+    bank = tmp_path / "project" / ".memory-bank"
+    bank.mkdir(parents=True)
+    outside = tmp_path / "outside.md"
+    outside.write_text("- Active: sensitive outside task\n", encoding="utf-8")
+    (bank / "currentTask.md").symlink_to(outside)
+
+    hint = ip._project_hint(str(bank.parent))
+
+    assert "sensitive outside task" not in hint
+    assert "currentTask=" not in hint
+
+
+def test_project_hint_rejects_symlinked_memory_bank(tmp_path: Path):
+    outside_bank = tmp_path / "outside-bank"
+    outside_bank.mkdir()
+    (outside_bank / "currentTask.md").write_text(
+        "- Active: sensitive task in linked bank\n",
+        encoding="utf-8",
+    )
+    project = tmp_path / "project"
+    project.mkdir()
+    (project / ".memory-bank").symlink_to(outside_bank, target_is_directory=True)
+
+    hint = ip._project_hint(str(project))
+
+    assert "sensitive task" not in hint
+    assert "currentTask=" not in hint
+
+
+def test_project_hint_rejects_oversized_currenttask(tmp_path: Path):
+    bank = tmp_path / ".memory-bank"
+    bank.mkdir()
+    (bank / "currentTask.md").write_text(
+        "- Active: " + ("x" * 64_001),
+        encoding="utf-8",
+    )
+
+    assert "currentTask=" not in ip._project_hint(str(tmp_path))
+
+
 def test_project_hint_skips_historical_completed_task_lines():
     with tempfile.TemporaryDirectory() as d:
         mb = Path(d) / ".memory-bank"

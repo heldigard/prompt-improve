@@ -16,21 +16,23 @@ from pathlib import Path
 
 
 def _bootstrap_source() -> None:
-    candidates = []
-    if home := os.environ.get("PROMPT_IMPROVE_HOME"):
-        candidates.append(Path(home))
     here = Path(__file__).resolve()
-    candidates.extend([here.parent, here.parent.parent])
-    try:
-        candidates.append(here.parents[2] / "prompt-improve")
-    except IndexError:
-        pass
-    candidates.append(Path.home() / "prompt-improve")
+    candidates: list[Path] = []
+    if home := os.environ.get("PROMPT_IMPROVE_HOME"):
+        candidates.append(Path(home).expanduser())
+    candidates.extend((here.parent, here.parent.parent, Path.home() / "prompt-improve"))
+    candidates.extend(parent / "prompt-improve" for parent in here.parents)
 
+    seen: set[Path] = set()
     for project in candidates:
-        src = project / "src"
-        if src.exists():
-            sys.path.insert(0, str(src))
+        if project in seen:
+            continue
+        seen.add(project)
+        source = project / "src"
+        if source.is_dir():
+            source_text = str(source)
+            if source_text not in sys.path:
+                sys.path.insert(0, source_text)
             return
 
 

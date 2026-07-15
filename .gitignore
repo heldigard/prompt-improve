@@ -14,6 +14,13 @@ htmlcov/
 .ruff_cache/
 .tags
 *.log
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+credentials.json
+*credentials*.json
 .memory-bank/.index/
 
 # Local Claude Code harness artifacts (auto-setup marker, orchestrator registry)

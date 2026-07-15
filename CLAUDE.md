@@ -5,12 +5,14 @@ Codex/Gemini via symlink). Graduated from the monolithic
 `~/.claude/hooks/prompt-improve.py` (1244L) into its own vertical-slice package,
 mirroring the `codeq` and `smart-trim` project layouts.
 
-## Architecture: vertical-slice hook package (NOT a CLI)
+## Architecture: vertical-slice hook package with diagnostic CLI
 
-prompt-improve is a **UserPromptSubmit hook**, not a CLI. Entry point is
+prompt-improve is primarily a **UserPromptSubmit hook**. Its event entry point is
 `~/.claude/hooks/prompt-improve.py` — a ~20-line **shim** that does only:
 `from prompt_improve.command import main; main()`. The hook is wired in
-`~/.claude/settings.json`. The shim preserves that wired path.
+`~/.claude/settings.json` through `user-prompt-pipeline.py`. The shim preserves
+that wired path. The installed `prompt-improve` command dispatches `improve`,
+`classify`, `detect`, and `target` for offline inspection.
 
 ## Layout
 
@@ -42,6 +44,7 @@ scripts/
 - Install (dev): `pip install -e .`
 - Test: `python3 -m pytest tests/ -q`
 - Lint: `ruff check .` · Format: `ruff format --check .`
+- CLI: `prompt-improve detect --prompt "fix foo.py"`
 
 ## Model routing
 
