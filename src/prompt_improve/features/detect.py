@@ -103,15 +103,12 @@ def detect_trivial(prompt: str) -> bool:
     trivial_exact = [
         r"^(ok|okay|o[kK]?|thanks?|thank you|gracias|got it|done|listo|vale|yes|no|yep|nope|sure|cool|great|perfect|genial|perfecto)([!\.\s]+(ok|okay|thanks?|gracias|listo|vale|done|yes|no))*[!\.\s]*$",
         r"^(hi|hello|hey|bye|goodbye|hola|chao|adios|adiós)[!\.\s]*$",
+        # Slash-commands: bare or with args. re.match() is prefix-only so
+        # "/commit the changes" matches — the downstream CLI handles args;
+        # rewriting locally would discard the user's intent.
         r"^/(commit|git|review|plan|refactor|help|setup|resume|clear|compact|status)",
     ]
     if any(re.match(t, p) for t in trivial_exact):
-        return True
-    # Slash-command with arguments is an actionable command, not trivia.
-    # The downstream CLI handles routing/args; rewriting it locally would
-    # discard the user's intent. Detect it BEFORE the length/verb fallback so
-    # "/commit the changes" passes through.
-    if re.match(r"^/[a-z][a-z0-9_-]*(?:\s|$)", p):
         return True
     if (
         len(p) < 24

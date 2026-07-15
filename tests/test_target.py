@@ -212,9 +212,17 @@ def test_shape_by_cli_overrides_model_family(monkeypatch):
     assert profile_for_cli("weird-cli", "x").family == "generic"
 
 
-def test_permission_mode_alone_does_not_claim_non_claude_payload():
+def test_permission_mode_alone_does_not_claim_non_claude_payload(monkeypatch):
+    """permission_mode alone does NOT imply Claude CLI.
+
+    Other env vars (e.g. ANTHROPIC_MODEL) must be scrubbed so env-based
+    detection does not win over the bare payload — the test is asserting that
+    ``permission_mode`` in the payload is NOT a Claude CLI signal.
+    """
     from prompt_improve.features.target import target_profile_from_request
 
+    for var in _TARGET_SCRUB_VARS:
+        monkeypatch.delenv(var, raising=False)
     target = target_profile_from_request(
         {
             "hook_event_name": "UserPromptSubmit",
