@@ -7,6 +7,20 @@ from prompt_improve.shared.paths import _ecosystem_skill_hint, project_hint_for_
 
 
 def test_ecosystem_skill_hint_detection_english() -> None:
+    hint = _ecosystem_skill_hint(
+        "design Microsoft Foundry reasoning summaries and traces", "English"
+    )
+    assert "azure-foundry-agents" in hint
+    assert "raw chain-of-thought" in hint
+
+    assert "azure-foundry-agents" not in _ecosystem_skill_hint(
+        "compare OpenAI reasoning summaries with local model output", "English"
+    )
+
+    hint = _ecosystem_skill_hint("build an Azure Functions Python function_app.py", "English")
+    assert "azure-functions-python" in hint
+    assert "Flex Consumption" in hint
+
     # Angular
     hint = _ecosystem_skill_hint("make an angular component", "English")
     assert "ecosystem guideline: For Angular, use Angular v22" in hint
@@ -41,6 +55,12 @@ def test_ecosystem_skill_hint_detection_english() -> None:
 
 
 def test_ecosystem_skill_hint_detection_spanish() -> None:
+    hint = _ecosystem_skill_hint("crear agente en Microsoft Foundry", "Spanish")
+    assert "azure-foundry-agents" in hint
+
+    hint = _ecosystem_skill_hint("crear Azure Functions con Python", "Spanish")
+    assert "azure-functions-python" in hint
+
     # Angular
     hint = _ecosystem_skill_hint("crear un componente de angular", "Spanish")
     assert "pauta del ecosistema: Para Angular, usa Angular v22" in hint

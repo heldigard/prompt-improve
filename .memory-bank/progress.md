@@ -89,3 +89,5 @@
 
 
 - 2026-07-14T23:11:52Z | - 2026-07-14: DeepSeek-R1 reasoner detection + guidance landed (commit 9f211c6, pushed origin/main). _deepseek_style + _variant_guidance R1 branch + 2 tests. Bundle also committed the in-flight metrics instrumentation WIP (shared/metrics.py + wiring) per user decision 'commitear todo junto'. Full suite 210 passed; ruff/mypy clean.
+- 2026-07-15T01:34:50Z | status:completed | Added deterministic English/Spanish guidance for canonical azure-foundry-agents and Azure Functions/Flex routing, including reasoning-summary privacy and managed-identity deployment constraints. Full validation passes.
+- 2026-07-15T02:28:07Z | status:completed | Second pass narrowed Foundry detection: generic OpenAI reasoning-summary prompts no longer receive Azure Foundry guidance; Azure/Foundry context remains required and tested.

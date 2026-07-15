@@ -314,6 +314,30 @@ def _ecosystem_skill_hint(prompt: str, language: str | None = None) -> str:
 
     is_sp = language == "Spanish"
 
+    # Check Microsoft Foundry before generic Python/TypeScript signals. Use the
+    # canonical installed skill name; marketplace source-tree names are not
+    # guaranteed to be invocable in the receiving CLI.
+    if re.search(
+        r"\b(?:microsoft|azure|ai)[- ]?foundry\b|\bfoundry[- ]?(?:agent|project|eval)\b|"
+        r"\b(?:azure|foundry)\b.{0,120}\breasoning summar(?:y|ies)\b|"
+        r"\breasoning summar(?:y|ies)\b.{0,120}\b(?:azure|foundry)\b",
+        p,
+    ):
+        return (
+            "pauta del ecosistema: Para Microsoft Foundry, carga la skill azure-foundry-agents; usa Responses API, reasoning summaries (nunca chain-of-thought crudo), trazas con acceso restringido y validación antes de desplegar."
+            if is_sp
+            else "ecosystem guideline: For Microsoft Foundry, load the azure-foundry-agents skill; use the Responses API, reasoning summaries (never raw chain-of-thought), access-controlled traces, and validation before deploy."
+        )
+    # Check Azure Functions before the generic Python branch.
+    if re.search(
+        r"\bazure[- ]?functions?\b|\bfunction[- ]?app\b|\bfunction_app\.py\b|\b(?:http|timer|blob)trigger\b",
+        p,
+    ):
+        return (
+            "pauta del ecosistema: Para Azure Functions, carga azure-functions y azure-functions-python cuando aplique; prefiere Flex Consumption para Linux nuevo, identidad administrada y despliegue por pipeline."
+            if is_sp
+            else "ecosystem guideline: For Azure Functions, load azure-functions and azure-functions-python when applicable; prefer Flex Consumption for new Linux apps, managed identity, and pipeline deployment."
+        )
     # Check Angular
     if re.search(r"\bangular\b|\bng-|\b@angular\b|\bngx-", p):
         return (
