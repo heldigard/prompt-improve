@@ -130,3 +130,73 @@ def test_rule_based_suggestions_localized_to_prompt_language():
     assert es is not None
     assert es.startswith("Sugerencias para clarificar el prompt:")
     assert "Specify" not in es
+
+
+# --- native Claude XML passthrough -------------------------------------------
+# Native Claude Code emits <task>/<objective>/<context>/<constraints>/<acceptance>
+# blocks when it classifies the user prompt. A second rewrite from prompt-improve
+# would dilute that structure, so has_concrete_target() must detect the closing
+# tag and short-circuit to passthrough. Closing tag required — a half-typed
+# `<task>` does NOT passthrough (the prompt could still be vague content).
+_NATIVE_XML_PASSTHROUGH = [
+    "<task>Fix the login bug</task>",
+    "<objective>Reduce latency under 200ms</objective>",
+    "<context>Working on smart-trim v3.4\n<context>deploy target is prod</context>\n<task>ship it</task>",
+    "<constraints>no new deps</constraints>\n<acceptance>all tests pass</acceptance>",
+    "<task>\n  ship smart-trim 3.4\n</task>\n\nignore above",
+    "<TASK>case-insensitive match</TASK>",
+]
+
+
+def test_has_concrete_target_true_for_native_claude_xml():
+    for p in _NATIVE_XML_PASSTHROUGH:
+        assert ip.has_concrete_target(p) is True, f"should passthrough: {p!r}"
+
+
+def test_has_concrete_target_false_for_unclosed_xml_tag():
+    """A half-typed opening tag must NOT trigger passthrough — user might be
+    describing content literally ('the <task> tag in our schema') or pasting
+    XML mid-edit."""
+    assert not ip.has_concrete_target("<task> open ended, no closing tag")
+    assert not ip.has_concrete_target("explain the <task> tag in our XML schema")
+
+
+def test_has_concrete_target_false_for_unrelated_xml():
+    """Plain XML that is NOT one of the native Claude tags must not passthrough
+    — only task/objective/context/constraints/acceptance are Claude's
+    classifier output. A <div> or <script> block is unrelated content."""
+    assert not ip.has_concrete_target("<div>some html</div>")
+    assert not ip.has_concrete_target("<script>alert(1)</script>")
+
+
+def test_has_concrete_target_short_native_xml_passthrough():
+    """Native XML passthrough must NOT require a long prompt — the closing
+    tag is the only signal we need."""
+    assert ip.has_concrete_target("<task>x</task>")
+
+
+def test_has_concrete_target_relative_dot_path() -> None:
+    from prompt_improve.features.detect import has_concrete_target
+    assert has_concrete_target("fix ./foo.py") is True
+
+
+def test_has_concrete_target_home_relative_path() -> None:
+    from prompt_improve.features.detect import has_concrete_target
+    assert has_concrete_target("update ~/projects/x.py") is True
+
+
+def test_has_concrete_target_absolute_path() -> None:
+    from prompt_improve.features.detect import has_concrete_target
+    assert has_concrete_target("review /home/eldi/x.py") is True
+
+
+def test_has_concrete_target_quoted_relative_path() -> None:
+    from prompt_improve.features.detect import has_concrete_target
+    assert has_concrete_target('lint "src/foo.ts"') is True
+
+
+def test_has_concrete_target_false_when_no_path_or_ext() -> None:
+    from prompt_improve.features.detect import has_concrete_target
+    assert has_concrete_target("fix it") is False
+    assert has_concrete_target("update this thing") is False
+    assert has_concrete_target("fix foo") is False

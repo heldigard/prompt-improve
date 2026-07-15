@@ -32,6 +32,19 @@ _SPANISH_MARKER_RE = re.compile(
     re.IGNORECASE,
 )
 
+# Native Claude Code prompt classification emits XML-style blocks. When the
+# user prompt already contains one of these tags, prompt-improve should NOT
+# rewrite it: the native classifier has already shaped the prompt and a
+# second rewrite would dilute the structure. Detection requires a CLOSING
+# tag (`<task>...</task>`) so a half-typed or single-tag prompt does not
+# trigger the gate. The list mirrors the tags Claude's classifier actually
+# emits today (task/objective/context/constraints/acceptance).
+_NATIVE_CLAUDE_XML_RE = re.compile(
+    r"<(?:task|objective|context|constraints|acceptance)>[\s\S]+?</"
+    r"(?:task|objective|context|constraints|acceptance)>",
+    re.IGNORECASE,
+)
+
 
 def detect_language(prompt: str) -> str:
     """Heuristic Spanish/English detector. Both accented and unaccented markers match."""
@@ -46,7 +59,14 @@ def has_concrete_target(prompt: str) -> bool:
     Rewriting an actionable prompt with a smaller local model can only lose
     evidence. Paths, repository-style identifiers, or an explicit outcome
     clause are sufficient when paired with an action verb.
+
+    A native Claude XML block (e.g. ``<task>...</task>`` from the runtime
+    classifier) also counts as a concrete target — the prompt is already
+    shaped and a second rewrite would dilute the structure. Closing tags
+    are required so a half-typed tag does not silently passthrough.
     """
+    if _NATIVE_CLAUDE_XML_RE.search(prompt):
+        return True
     if not _CONCRETE_ACTION_RE.search(prompt):
         return False
     has_path = bool(_CONCRETE_FILE_RE.search(prompt)) or "/" in prompt or "\\" in prompt
@@ -86,6 +106,12 @@ def detect_trivial(prompt: str) -> bool:
         r"^/(commit|git|review|plan|refactor|help|setup|resume|clear|compact|status)",
     ]
     if any(re.match(t, p) for t in trivial_exact):
+        return True
+    # Slash-command with arguments is an actionable command, not trivia.
+    # The downstream CLI handles routing/args; rewriting it locally would
+    # discard the user's intent. Detect it BEFORE the length/verb fallback so
+    # "/commit the changes" passes through.
+    if re.match(r"^/[a-z][a-z0-9_-]*(?:\s|$)", p):
         return True
     if (
         len(p) < 24
