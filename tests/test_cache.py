@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import os
 import tempfile
 from pathlib import Path
@@ -132,6 +133,43 @@ def test_load_cached_rejects_corrupt_entry(monkeypatch, tmp_path):
 
     assert cmod.load_cached("some prompt", "rewrite") is None
     assert not path.exists(), "corrupt entry must be evicted so the next save can repopulate"
+
+
+def test_load_cached_evicts_malformed_json(monkeypatch, tmp_path):
+    import prompt_improve.shared.cache as cmod
+
+    monkeypatch.setattr(cmod, "CACHE_DIR", tmp_path)
+    monkeypatch.setattr(cmod, "CACHE_TTL_SECONDS", 300.0)
+    path = cmod._cache_path(cmod._cache_key("some prompt", "rewrite", None))
+    path.write_text("{partial", encoding="utf-8")
+
+    assert cmod.load_cached("some prompt", "rewrite") is None
+    assert not path.exists()
+
+
+def test_load_cached_does_not_evict_concurrent_replacement(monkeypatch, tmp_path):
+    import prompt_improve.shared.cache as cmod
+
+    monkeypatch.setattr(cmod, "CACHE_DIR", tmp_path)
+    monkeypatch.setattr(cmod, "CACHE_TTL_SECONDS", 300.0)
+    path = cmod._cache_path(cmod._cache_key("some prompt", "rewrite", None))
+    path.write_text("{partial", encoding="utf-8")
+    real_loads = cmod.json.loads
+
+    def replace_then_fail(_payload):
+        replacement = path.with_suffix(".replacement")
+        replacement.write_text(
+            '{"text": "fresh", "source": "ollama:new"}',
+            encoding="utf-8",
+        )
+        os.replace(replacement, path)
+        raise json.JSONDecodeError("corrupt old entry", "{partial", 0)
+
+    monkeypatch.setattr(cmod.json, "loads", replace_then_fail)
+
+    assert cmod.load_cached("some prompt", "rewrite") is None
+    assert path.exists()
+    assert real_loads(path.read_text(encoding="utf-8"))["text"] == "fresh"
 
 
 def test_prune_over_capacity_drops_oldest(monkeypatch, tmp_path):

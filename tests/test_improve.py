@@ -644,3 +644,33 @@ def test_route_hard_prompt_cloud_model_env_override(monkeypatch):
     finally:
         m.needs_cloud_intelligence = orig_needs
         m.call_cloud_cascade = orig_cloud
+
+
+def test_normalized_model_collision_is_deterministic(monkeypatch):
+    import prompt_improve.shared.ollama as omod
+
+    monkeypatch.setattr(omod, "available_ollama_models", lambda: ["model:latest", "model:Q4_K_M"])
+    monkeypatch.setattr(omod, "_ROLE_MODEL_MAP", {"prompt_rewrite": ["model:any"]})
+    monkeypatch.setattr(omod, "OLLAMA_MODEL_CANDIDATES", [])
+
+    primary, fallbacks = omod.choose_ollama_model_for_role("prompt_rewrite")
+
+    assert primary == "model:Q4_K_M"
+    assert fallbacks == ["model:latest"]
+
+
+def test_ollama_discovery_rejects_oversized_response(monkeypatch):
+    import prompt_improve.shared.ollama as omod
+
+    class Response:
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *args):
+            return False
+
+        def read(self, size):
+            return b"x" * size
+
+    monkeypatch.setattr(omod, "urlopen", lambda *args, **kwargs: Response())
+    assert omod._get_json("/api/tags", timeout=0.1) is None

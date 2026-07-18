@@ -78,6 +78,23 @@ def _cache_path(key: str) -> Path:
     return CACHE_DIR / f"{key}.json"
 
 
+def _evict_if_unchanged(path: Path, snapshot: os.stat_result) -> None:
+    """Remove a bad entry only when no concurrent writer replaced it."""
+    try:
+        current = path.stat()
+        identity = (current.st_dev, current.st_ino, current.st_mtime_ns, current.st_size)
+        expected = (
+            snapshot.st_dev,
+            snapshot.st_ino,
+            snapshot.st_mtime_ns,
+            snapshot.st_size,
+        )
+        if identity == expected:
+            path.unlink(missing_ok=True)
+    except OSError:
+        pass
+
+
 def load_cached(prompt: str, mode: str, cwd: str | None = None) -> tuple[str, str] | None:
     if CACHE_TTL_SECONDS <= 0:
         return None
@@ -85,8 +102,12 @@ def load_cached(prompt: str, mode: str, cwd: str | None = None) -> tuple[str, st
     if not path.exists():
         return None
     try:
-        if time.time() - path.stat().st_mtime > CACHE_TTL_SECONDS:
-            path.unlink(missing_ok=True)
+        snapshot = path.stat()
+    except OSError:
+        return None
+    try:
+        if time.time() - snapshot.st_mtime > CACHE_TTL_SECONDS:
+            _evict_if_unchanged(path, snapshot)
             return None
         data = json.loads(path.read_text(encoding="utf-8"))
         text = data.get("text")
@@ -94,10 +115,11 @@ def load_cached(prompt: str, mode: str, cwd: str | None = None) -> tuple[str, st
         # A corrupt/partial entry must be a MISS, not a truthy (None, None)
         # tuple that silently disables improvement until the TTL expires.
         if not isinstance(text, str) or not text or not isinstance(source, str):
-            path.unlink(missing_ok=True)
+            _evict_if_unchanged(path, snapshot)
             return None
         return text, source
     except (OSError, json.JSONDecodeError, ValueError):
+        _evict_if_unchanged(path, snapshot)
         return None
 
 
@@ -113,6 +135,8 @@ def save_cached(prompt: str, mode: str, text: str, source: str, cwd: str | None 
         try:
             with os.fdopen(fd, "w", encoding="utf-8") as handle:
                 handle.write(json.dumps({"text": text, "source": source}, ensure_ascii=False))
+                handle.flush()
+                os.fsync(handle.fileno())
             os.replace(tmp_name, path)
         except OSError:
             Path(tmp_name).unlink(missing_ok=True)

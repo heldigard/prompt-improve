@@ -2,10 +2,21 @@
 
 from __future__ import annotations
 
+import ipaddress
 from urllib.parse import urlparse
 
 DEFAULT_OLLAMA_URL = "http://127.0.0.1:11434"
-LOOPBACK_HOSTS = frozenset({"localhost", "127.0.0.1", "::1"})
+
+
+def _is_loopback_host(hostname: str | None) -> bool:
+    if not hostname:
+        return False
+    if hostname.lower() == "localhost":
+        return True
+    try:
+        return ipaddress.ip_address(hostname).is_loopback
+    except ValueError:
+        return False
 
 
 def normalize_ollama_url(value: str | None = None) -> str:
@@ -20,7 +31,7 @@ def normalize_ollama_url(value: str | None = None) -> str:
         return DEFAULT_OLLAMA_URL
     if (
         parsed.scheme != "http"
-        or hostname not in LOOPBACK_HOSTS
+        or not _is_loopback_host(hostname)
         or has_credentials
         or parsed.path not in ("", "/")
         or parsed.params
@@ -29,6 +40,7 @@ def normalize_ollama_url(value: str | None = None) -> str:
         or (port is not None and port == 0)
     ):
         return DEFAULT_OLLAMA_URL
-    rendered_host = f"[{hostname}]" if hostname == "::1" else hostname
+    assert hostname is not None  # established by _is_loopback_host above
+    rendered_host = f"[{hostname}]" if ":" in hostname else hostname
     rendered_port = f":{port}" if port is not None else ""
     return f"http://{rendered_host}{rendered_port}"

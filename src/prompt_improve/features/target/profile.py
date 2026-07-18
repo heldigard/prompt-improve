@@ -242,9 +242,14 @@ def _cli_from_env_or_model(model: str | None) -> str | None:
         cli = identity.split(":", 1)[0].strip()
         if cli:
             return "antigravity" if cli == "gemini" else cli
-    if os.environ.get("CODEX_WORKER") or any(k.startswith("CODEX_") for k in os.environ):
+    # Prefer explicit harness markers only. A blanket CLAUDE_CODE_* / CODEX_*
+    # prefix match is too aggressive: nested shells under Claude Code export
+    # flags like CLAUDE_CODE_DISABLE_TERMINAL_TITLE that would mis-label
+    # Codex/Gemini/Grok sessions as Claude (breaks permission_mode-only
+    # payloads and non-Claude hooks that inherit the parent env).
+    if os.environ.get("CODEX_WORKER") or os.environ.get("CODEX_SANDBOX"):
         return "codex"
-    if os.environ.get("CLAUDECODE") or any(k.startswith("CLAUDE_CODE_") for k in os.environ):
+    if os.environ.get("CLAUDECODE") or os.environ.get("CLAUDE_CODE_ENTRYPOINT"):
         return "claude"
     if os.environ.get("ANTHROPIC_MODEL") or os.environ.get("ANTHROPIC_BASE_URL"):
         return "claude"

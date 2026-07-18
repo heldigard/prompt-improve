@@ -19,6 +19,8 @@ import time
 from collections import Counter
 from pathlib import Path
 
+from prompt_improve.shared import filelock
+
 _counts: Counter[str] = Counter()
 
 
@@ -55,10 +57,16 @@ def _persist_jsonl(items: dict[str, int]) -> None:
     try:
         target = _metrics_dir()
         target.mkdir(parents=True, exist_ok=True)
-        with (target / "metrics.jsonl").open("a") as fh:
-            fh.write(
-                json.dumps({"ts": int(time.time()), "counts": items}, separators=(",", ":")) + "\n"
-            )
+        with (target / "metrics.jsonl").open("a", encoding="utf-8") as fh:
+            with filelock.try_exclusive_lock(fh) as acquired:
+                if not acquired:
+                    return
+                fh.write(
+                    json.dumps({"ts": int(time.time()), "counts": items}, separators=(",", ":"))
+                    + "\n"
+                )
+                fh.flush()
+                os.fsync(fh.fileno())
     except OSError:
         return
 

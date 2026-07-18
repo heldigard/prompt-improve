@@ -20,6 +20,8 @@ from prompt_improve.features.target import TargetProfile, target_profile_from_re
 from prompt_improve.shared import metrics
 from prompt_improve.shared.config import OLLAMA_TOTAL_TIMEOUT
 
+MAX_STDIN_CHARS = 1_000_000
+
 
 def _passthrough() -> None:
     print(json.dumps({"continue": True}))
@@ -105,9 +107,12 @@ def _handle_cli_flags() -> bool:
 def _read_stdin_payload() -> tuple[str, str | None, dict | None, bool]:
     """Read stdin JSON-or-plain input. Returns (prompt, cwd, payload, content_read)."""
     try:
-        content = sys.stdin.read().strip()
+        content = sys.stdin.read(MAX_STDIN_CHARS + 1)
     except OSError:
         return "", None, None, False
+    if len(content) > MAX_STDIN_CHARS:
+        return "", None, None, True
+    content = content.strip()
     if not content:
         return "", None, None, False
     try:

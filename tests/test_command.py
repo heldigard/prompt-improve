@@ -437,3 +437,12 @@ def test_command_main_fails_open_on_unexpected_error(monkeypatch):
     data = json.loads(out)
     assert data["continue"] is True
     assert "hookSpecificOutput" not in data
+
+
+def test_stdin_payload_rejects_oversized_input(monkeypatch):
+    import io
+
+    import prompt_improve.command as command
+
+    monkeypatch.setattr(command.sys, "stdin", io.StringIO("x" * (command.MAX_STDIN_CHARS + 1)))
+    assert command._read_stdin_payload() == ("", None, None, True)

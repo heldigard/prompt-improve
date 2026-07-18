@@ -7,6 +7,7 @@ import json
 import os
 import subprocess
 import sys
+from contextlib import contextmanager
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -99,6 +100,26 @@ def test_metrics_persists_jsonl_when_enabled(tmp_path, monkeypatch) -> None:
     assert "ollama" in line and "cache:hit" in line
     rec = json.loads(line)
     assert rec["counts"]["ollama"] == 1
+
+
+def test_metrics_busy_lock_skips_optional_persistence(tmp_path, monkeypatch) -> None:
+    monkeypatch.setenv("OLLAMA_IMPROVE_METRICS_PERSIST", "1")
+    monkeypatch.setenv("OLLAMA_IMPROVE_METRICS_DIR", str(tmp_path))
+    from prompt_improve.shared import metrics
+
+    @contextmanager
+    def busy_lock(_handle):
+        yield False
+
+    monkeypatch.setattr(metrics.filelock, "try_exclusive_lock", busy_lock)
+    metrics._counts.clear()
+    metrics.record("ollama")
+
+    metrics.emit()
+
+    target = tmp_path / "metrics.jsonl"
+    assert target.exists()
+    assert target.read_text(encoding="utf-8") == ""
 
 
 def test_metrics_silent_when_disabled(tmp_path, monkeypatch, capsys) -> None:

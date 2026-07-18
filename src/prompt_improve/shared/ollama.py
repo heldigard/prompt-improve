@@ -19,13 +19,19 @@ from prompt_improve.shared.config import (
     OLLAMA_URL,
 )
 
+MAX_OLLAMA_RESPONSE_BYTES = 1_048_576
+
 
 def _get_json(path: str, timeout: float) -> dict | None:
     try:
         # OLLAMA_URL is normalized to http loopback in shared.config.
         url = f"{OLLAMA_URL.rstrip('/')}{path}"
         with urlopen(url, timeout=timeout) as response:  # nosemgrep
-            return json.loads(response.read().decode("utf-8"))
+            raw = response.read(MAX_OLLAMA_RESPONSE_BYTES + 1)
+            if len(raw) > MAX_OLLAMA_RESPONSE_BYTES:
+                return None
+            data = json.loads(raw.decode("utf-8"))
+            return data if isinstance(data, dict) else None
     except (HTTPError, URLError, TimeoutError, OSError, ValueError, json.JSONDecodeError):
         return None
 
@@ -128,10 +134,10 @@ def choose_ollama_model_for_role(role: str) -> tuple[str | None, list[str]]:
 
     # Map normalized names to actual available names for fallback matching
     norm_available: dict[str, str] = {}
-    for actual in available:
+    for actual in sorted(available):
         norm = _normalize_model_name(actual)
         if norm:
-            norm_available[norm] = actual
+            norm_available.setdefault(norm, actual)
 
     def find_match(cand: str) -> str | None:
         if cand in available:
