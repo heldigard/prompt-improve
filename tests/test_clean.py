@@ -101,6 +101,23 @@ def test_clean_rewrite_allows_verified_close_path_correction(monkeypatch, tmp_pa
     assert ip._clean_rewrite(raw, original) is not None
 
 
+def test_clean_rewrite_accepts_xml_section_tags_from_chain_models():
+    """Round-17 chain models emit <task>…</task> structure; closing tags must
+    not be misread as absolute paths by the unsupported-specifics guard."""
+    raw = (
+        "<task>Continúa la tarea actual.</task>\n"
+        "<context>Sesión activa con trabajo previo sin terminar.</context>\n"
+        "<constraints>Continuar la ejecución de la tarea existente.</constraints>\n"
+        "<acceptance>Verificar el estado actual y proceder con la siguiente acción.</acceptance>"
+    )
+    assert ip._clean_rewrite(raw, "continua") is not None
+
+
+def test_clean_rewrite_still_rejects_path_after_xml_stripping():
+    raw = "<task>Inspect `~/invented-dir/cache/` and rank models.</task>"
+    assert ip._clean_rewrite(raw, "review ollama bench") is None
+
+
 def test_trim_bullet_short_line_unchanged():
     assert ip._trim_bullet("short line") == "short line"
 

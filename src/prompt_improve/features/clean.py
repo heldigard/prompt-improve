@@ -10,6 +10,11 @@ from prompt_improve.features.detect import detect_language
 from prompt_improve.shared.config import _ABSOLUTE_REPLACEMENTS
 
 _PATH_LITERAL_RE = re.compile(r"(?<![\w.])(?:~/|/)[A-Za-z0-9._+@:-]+(?:/[A-Za-z0-9._+@:-]+)*/?")
+# Structured-spec section tags emitted by the round-17 chain models
+# (<task>…</task>, <context>…</context>, …). Closing tags like </task> match
+# _PATH_LITERAL_RE as if they were absolute paths, so they must be stripped
+# before the unsupported-paths check.
+_XML_TAG_RE = re.compile(r"</?[A-Za-z][\w.-]*\s*/?>")
 _UNSUPPORTED_TECH_RE = re.compile(
     r"\b(?:codescan|golang|python|django|fastapi|java|spring(?: boot)?|javascript|"
     r"typescript|react|angular|vue|rust|kubernetes|docker|terraform|postgresql|"
@@ -53,7 +58,7 @@ def introduces_unsupported_specifics(text: str, original: str) -> bool:
     framework, quality tool, or filesystem location absent from the user input.
     """
     original_paths = {path.rstrip("/") for path in _PATH_LITERAL_RE.findall(original)}
-    for path in _PATH_LITERAL_RE.findall(text):
+    for path in _PATH_LITERAL_RE.findall(_XML_TAG_RE.sub(" ", text)):
         if path.rstrip("/") not in original_paths and not _verified_close_path(
             path, original_paths
         ):
