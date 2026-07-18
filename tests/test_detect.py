@@ -102,6 +102,12 @@ def test_has_concrete_target_true():
     assert ip.has_concrete_target(
         "revisa prompt-improve, smart-trim y ollama-client y corrige sus contratos"
     )
+    assert ip.has_concrete_target(
+        "optimize a slow PostgreSQL query with explain analyze indexes"
+    )
+    assert ip.has_concrete_target(
+        "mejora el ecosistema cross-cli para ahorrar tokens sin perder calidad"
+    )
 
 
 def test_has_concrete_target_false_for_vague():
@@ -109,6 +115,9 @@ def test_has_concrete_target_false_for_vague():
     assert not ip.has_concrete_target("fix the bug")
     assert not ip.has_concrete_target("add tests")
     assert not ip.has_concrete_target("mejora el rendimiento")
+    assert not ip.has_concrete_target("fix this API thing because it fails")
+    assert not ip.has_concrete_target("improve this test please because it is bad")
+    assert not ip.has_concrete_target("review the service and make it better somehow")
 
 
 def test_depends_on_conversation_context():

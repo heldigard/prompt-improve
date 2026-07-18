@@ -150,9 +150,11 @@ _CONCRETE_FILE_RE = re.compile(
 )
 _CONCRETE_ACTION_RE = re.compile(
     r"\b(?:fix|edit|update|add|refactor|open|review|test|run|debug|lint|format|"
-    r"build|deploy|check|migrate|implement|create|generate|arregla|edita|actualiza|"
+    r"build|deploy|check|migrate|implement|create|generate|optimize|improve|audit|"
+    r"profile|tune|validate|investigate|arregla|edita|actualiza|"
     r"abre|revisa|corrige|despliega|construye|ejecuta|verifica|compila|migra|"
-    r"implementa|crea|genera)\b",
+    r"implementa|crea|genera|optimiza|mejora|mejorar|audita|perfila|afina|"
+    r"valida|investiga)\b",
     re.IGNORECASE,
 )
 

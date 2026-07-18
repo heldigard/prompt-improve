@@ -45,6 +45,14 @@ _NATIVE_CLAUDE_XML_RE = re.compile(
     re.IGNORECASE,
 )
 
+_CONCRETE_TECH_TARGET_RE = re.compile(
+    r"\b(?:query|consulta|parser|endpoint|api|database|base de datos|indexes?|índices?|"
+    r"component|componente|service|servicio|module|módulo|function|función|class|"
+    r"clase|workflow|pipeline|router|hook|profile|perfil|config(?:uration)?|"
+    r"configuración|schema|esquema|migration|migración|test(?:s)?|pruebas?)\b",
+    re.IGNORECASE,
+)
+
 
 def detect_language(prompt: str) -> str:
     """Heuristic Spanish/English detector. Both accented and unaccented markers match."""
@@ -71,6 +79,13 @@ def has_concrete_target(prompt: str) -> bool:
         return False
     has_path = bool(_CONCRETE_FILE_RE.search(prompt)) or "/" in prompt or "\\" in prompt
     has_repo_name = bool(re.search(r"\b[a-z0-9]+(?:-[a-z0-9]+)+\b", prompt, re.IGNORECASE))
+    technical_targets = {
+        match.group(0).lower() for match in _CONCRETE_TECH_TARGET_RE.finditer(prompt)
+    }
+    # One generic noun ("API", "service", "test") is still vague. Two
+    # independent technical anchors ("PostgreSQL query" + "indexes", "API
+    # endpoint") give the controller enough scope without a lossy rewrite.
+    has_technical_target = len(prompt.split()) >= 6 and len(technical_targets) >= 2
     has_explicit_outcome = bool(
         len(prompt.split()) >= 8
         and re.search(
@@ -81,7 +96,7 @@ def has_concrete_target(prompt: str) -> bool:
             re.IGNORECASE,
         )
     )
-    return has_path or has_repo_name or has_explicit_outcome
+    return has_path or has_repo_name or has_technical_target or has_explicit_outcome
 
 
 def depends_on_conversation_context(prompt: str) -> bool:
