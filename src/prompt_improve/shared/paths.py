@@ -228,7 +228,10 @@ _TOPIC_INDEX_LINE_RE = re.compile(r"^\s*-\s+\[([^\]]+)\]\(([0-9a-zA-Z_\-]+)\.md\
 # Words ignored when scoring prompt↔topic overlap (too generic to anchor on).
 _TOPIC_STOPWORDS = frozenset(
     "the a an of for to in on at with and or topic topics index tbd project "
-    "memory bank deep context session agent".split()
+    "memory bank deep context session agent "
+    "el la los las de del para por en con y o un una este esta estos estas "
+    "proyecto proyectos tema temas contexto sesion agente mejora mejorar "
+    "revisa revisar".split()
 )
 _OPERATIONAL_TOPIC_SLUGS = frozenset(
     {
@@ -275,8 +278,8 @@ def _topic_hint(prompt: str, root: Path, max_scan: int = 40) -> str:
         if slug in _OPERATIONAL_TOPIC_SLUGS:
             continue
         desc = line[match.end() :].lstrip(" \t—-")
-        hay = f"{title} {desc}".lower()
-        score = sum(1 for tok in prompt_tokens if tok in hay)
+        topic_tokens = _tokenize_for_topic(f"{title} {desc}")
+        score = len(prompt_tokens & topic_tokens)
         if score > best_score:
             best_score = score
             best_slug = slug

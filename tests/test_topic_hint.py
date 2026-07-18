@@ -84,6 +84,29 @@ def test_topic_hint_empty_when_only_stopword_overlap(tmp_path: Path) -> None:
     assert _topic_hint("the a an of for to in on", tmp_path) == ""
 
 
+def test_topic_hint_ignores_generic_spanish_project_request(tmp_path: Path) -> None:
+    bank = tmp_path / ".memory-bank"
+    bank.mkdir()
+    _write_index(
+        bank,
+        "## Topics\n"
+        "- [Tested Models](tested-models.md) — modelos probados para el proyecto\n",
+    )
+
+    assert _topic_hint("mejora este proyecto", tmp_path) == ""
+
+
+def test_topic_hint_matches_exact_tokens_not_substrings(tmp_path: Path) -> None:
+    bank = tmp_path / ".memory-bank"
+    bank.mkdir()
+    _write_index(
+        bank,
+        "## Topics\n- [Web Scraping](web-scraping.md) — page reader\n",
+    )
+
+    assert _topic_hint("repair the API", tmp_path) == ""
+
+
 def test_project_hint_appends_topic_on_overlap(tmp_path: Path) -> None:
     bank = tmp_path / ".memory-bank"
     bank.mkdir()

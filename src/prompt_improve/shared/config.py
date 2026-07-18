@@ -103,7 +103,7 @@ for _role, _default in [
 # ---------------------------------------------------------------------------
 CACHE_DIR = Path.home() / ".claude" / "cache" / "prompt-improve"
 CACHE_TTL_SECONDS = _finite_float(os.environ.get("OLLAMA_IMPROVE_CACHE_TTL"), 300.0)
-CACHE_SCHEMA_VERSION = "prompt-improve-v20"
+CACHE_SCHEMA_VERSION = "prompt-improve-v21"
 # Size bound: TTL eviction only catches expired entries; a long TTL plus many
 # distinct prompts would grow the on-disk cache without bound. When the entry
 # count exceeds this cap, oldest-by-mtime entries are evicted (LRU-ish).
