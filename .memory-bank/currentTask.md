@@ -1,11 +1,19 @@
 # Current Task
-
-> Updated: 2026-07-18
+> Updated: 2026-07-19
 
 ## Goal
-None — last work closed (Grok target + memory cleanup + push).
+Ship CLI help/exit-code fix + test split; push with skill-router pass.
 
-## Optional (non-blocking)
-- Refresh `SHAPES` behavior lines when `~/.claude/rules/model-specific.md` gains new failure-modes.
-- New fleet family → one `SHAPES` entry + one `_looks_like_*` matcher + tests.
-- Pipeline: `CLI_ORCHESTRATION_CALLER=grok` if cross-CLI orchestration needs it.
+## Status
+- **DONE** — suite green; ready to push.
+
+## Acceptance Criteria
+- [x] pytest + ruff green
+- [x] `prompt-improve --help` lists improve/detect/classify/target
+- [x] Subcommand exit codes reach the process
+- [x] Memory bank refreshed
+- [x] Commit + push
+
+## Optional later
+- New fleet family → `SHAPES` + matcher + tests
+- Refresh SHAPES from model-specific.md when it changes

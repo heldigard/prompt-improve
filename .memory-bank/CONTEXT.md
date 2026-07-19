@@ -1,31 +1,32 @@
 # CONTEXT - Current State
-> Updated: 2026-07-18
+> Updated: 2026-07-19
 
 ## What it does
 UserPromptSubmit hook that improves vague prompts before the agent sees them:
 - **Rewrite** (<260 chars vague) → structured spec; **Clarify** (longer) → 1–3 action bullets
 - **Cloud escalation** for hard domains (security/architecture/migration) → DeepSeek V4 Flash
 - **Passthrough** for trivial, concrete-path, anaphoric, or already-structured prompts
-- **Target-aware shaping**: format + behavior per receiving CLI/model family
+- **Target-aware shaping** per receiving CLI/model family (incl. **Grok Build**)
 - **Deterministic continuation** for bare "continua" (memory expansion, no LLM)
-- **Ecosystem skill hints** for known stacks (Angular, React, K8s, Foundry, …)
+- **Ecosystem skill hints** for known stacks
 
 ## Current version
-**17.2.0** — Grok Build is a first-class target family; Ollama improve tail excludes embeddings.
+**17.2.0** — Grok family + embedding-tail filter; CLI help documents diagnostic subcommands; exit codes propagate via `SystemExit`.
 
 ## Architecture
 ```
 shared/     config, cache, ollama, paths, metrics, compat
 features/   detect, classify, improve, clean, rules, hints, ecosystem, target/
 command.py  hook entry · cli.py diagnostic subcommands
+tests/      improve suite split: routing/cascade/role_model/fallback/messages + _helpers
 ```
-Shim: `~/.claude/hooks/prompt-improve.py` → package (symlinked to repo).
+Shim: `~/.claude/hooks/prompt-improve.py` → package (symlink to repo).
 
 ## Host (native Ubuntu 26)
-- Ollama via **system** `ollama.service` (systemd-first autostart; nohup only if no unit)
+- Ollama via system `ollama.service` (systemd-first)
 - Improve primary: `cryptidbleh/gemma4-claude-opus-4.6:latest` (round-17)
-- Target families: Claude, Codex/GPT, Gemini, Qwen, DeepSeek, GLM, MiniMax, Kimi, MiMo, Gemma, **Grok**, generic
+- PATH tool: `uv tool install -e .` → `prompt-improve==17.2.0`
 
 ## Blockers / Risks
-- Behavior mitigations are static text from `~/.claude/rules/model-specific.md` — refresh when that rule changes.
-- Shared `user-prompt-pipeline.py` controller list may omit `grok`; package still detects via `GROK_AGENT`.
+- Refresh `SHAPES` when `~/.claude/rules/model-specific.md` gains failure-modes.
+- Shared pipeline now includes `grok` in controllers (swarm-auto-delegate eligible).
