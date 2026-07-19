@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 import os
 import re
+import shutil
 import subprocess
 import time
 from urllib.error import HTTPError, URLError
@@ -48,8 +49,45 @@ def available_ollama_models() -> list[str]:
     return names
 
 
+def _systemctl_start_ollama() -> bool:
+    """Start Ollama through systemd when a unit exists.
+
+    On native Linux the daemon is a proper service (this host ships an enabled
+    system unit); starting it through the service manager keeps supervision,
+    logging, and GPU/env wiring in systemd instead of forking a rogue second
+    ``ollama serve`` that competes with the managed unit. Nonzero exits (no
+    unit, no polkit auth, systemctl missing) degrade to the nohup fallback.
+    """
+    if shutil.which("systemctl") is None:
+        return False
+    for scope in (["--user"], []):
+        base = ["systemctl", *scope]
+        try:
+            has_unit = subprocess.run(
+                [*base, "cat", "ollama.service"],
+                capture_output=True,
+                timeout=3,
+                check=False,
+            )
+            if has_unit.returncode != 0:
+                continue
+            started = subprocess.run(
+                [*base, "start", "ollama"],
+                capture_output=True,
+                timeout=5,
+                check=False,
+            )
+        except (OSError, subprocess.TimeoutExpired):
+            continue
+        if started.returncode == 0:
+            return True
+    return False
+
+
 def _spawn_ollama() -> bool:
-    """Launch ``ollama serve`` detached and record its pid. Best-effort."""
+    """Launch Ollama (systemd first, detached ``ollama serve`` fallback). Best-effort."""
+    if _systemctl_start_ollama():
+        return True
     try:
         os.makedirs(os.path.dirname(OLLAMA_LOG), exist_ok=True)
     except OSError:
@@ -97,8 +135,10 @@ def start_ollama_best_effort() -> bool:
         return True
     if not _spawn_ollama():
         return False
-    for _ in range(6):
-        time.sleep(0.25)
+    # systemd-managed units can take a little longer than a bare fork to report
+    # ready; keep the total wait bounded so the hook latency stays predictable.
+    for _ in range(10):
+        time.sleep(0.3)
         if available_ollama_models():
             return True
     return False

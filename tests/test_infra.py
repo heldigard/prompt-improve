@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import io
 import json
+import os
 import sys
 from pathlib import Path
 
@@ -100,6 +101,56 @@ def test_launch_ollama_serve_returns_none_when_log_dir_fails():
         assert result is None
     finally:
         omod.OLLAMA_LOG = orig_log
+
+
+def test_spawn_ollama_prefers_systemd_when_available(monkeypatch):
+    import prompt_improve.shared.ollama as omod
+
+    monkeypatch.setattr(omod.shutil, "which", lambda name: "/usr/bin/systemctl")
+    calls = []
+
+    class _Result:
+        returncode = 0
+
+    def _run(cmd, **kwargs):
+        calls.append(cmd)
+        return _Result()
+
+    monkeypatch.setattr(omod.subprocess, "run", _run)
+    monkeypatch.setattr(
+        omod, "_launch_ollama_serve", lambda: pytest.fail("nohup fallback must not run")
+    )
+    assert omod._spawn_ollama() is True
+    assert calls[0] == ["systemctl", "--user", "cat", "ollama.service"]
+    assert calls[1] == ["systemctl", "--user", "start", "ollama"]
+
+
+def test_spawn_ollama_falls_back_to_nohup_without_systemd(monkeypatch):
+    import prompt_improve.shared.ollama as omod
+
+    monkeypatch.setattr(omod.shutil, "which", lambda name: None)
+
+    class _Proc:
+        pid = 4242
+
+    monkeypatch.setattr(omod, "_launch_ollama_serve", lambda: _Proc())
+    monkeypatch.setattr(omod, "OLLAMA_PID", "/tmp/prompt-improve-test-ollama.pid")
+    try:
+        assert omod._spawn_ollama() is True
+    finally:
+        os.unlink("/tmp/prompt-improve-test-ollama.pid")
+
+
+def test_systemctl_start_returns_false_when_unit_missing(monkeypatch):
+    import prompt_improve.shared.ollama as omod
+
+    monkeypatch.setattr(omod.shutil, "which", lambda name: "/usr/bin/systemctl")
+
+    class _Result:
+        returncode = 1
+
+    monkeypatch.setattr(omod.subprocess, "run", lambda cmd, **kwargs: _Result())
+    assert omod._systemctl_start_ollama() is False
 
 
 def test_debug_noop_when_disabled():

@@ -13,12 +13,33 @@ MODEL="${OLLAMA_IMPROVE_WARM_MODEL:-cryptidbleh/gemma4-claude-opus-4.6:latest}" 
 
 mkdir -p "$LOG_DIR"
 
-if ! curl -fsS --max-time 1 "http://127.0.0.1:11434/api/tags" >/dev/null 2>&1; then
-    (
-        nohup ollama serve >>"$LOG_FILE" 2>&1 &
-        echo $! >"$PID_FILE"
-    ) >/dev/null 2>&1
-    sleep 0.5
+ollama_up() {
+    curl -fsS --max-time 1 "http://127.0.0.1:11434/api/tags" >/dev/null 2>&1
+}
+
+if ! ollama_up; then
+    started=0
+    # Native Ubuntu: the daemon is a systemd service — start it through the
+    # service manager so supervision/logging stay managed. Fall back to a
+    # detached `ollama serve` only where no unit exists (WSL, containers).
+    if command -v systemctl >/dev/null 2>&1; then
+        if systemctl --user cat ollama.service >/dev/null 2>&1; then
+            systemctl --user start ollama >/dev/null 2>&1 && started=1
+        elif systemctl cat ollama.service >/dev/null 2>&1; then
+            systemctl start ollama >/dev/null 2>&1 && started=1
+        fi
+    fi
+    if [ "$started" = "0" ]; then
+        (
+            nohup ollama serve >>"$LOG_FILE" 2>&1 &
+            echo $! >"$PID_FILE"
+        ) >/dev/null 2>&1
+    fi
+    # Wait for readiness (bounded) so the preload below actually warms the model.
+    for _ in 1 2 3 4 5 6 7 8 9 10; do
+        ollama_up && break
+        sleep 0.5
+    done
 fi
 
 if [ "${PROMPT_IMPROVER_PRELOAD:-1}" != "0" ]; then
