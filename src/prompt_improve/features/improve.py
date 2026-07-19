@@ -11,6 +11,7 @@ from time import monotonic
 from prompt_improve.features.classify import needs_cloud_intelligence
 from prompt_improve.features.clean import clean_response, clean_rewrite
 from prompt_improve.features.detect import detect_language
+from prompt_improve.features.hints import project_hint_for_prompt
 from prompt_improve.features.rules import SYSTEM_PROMPT, build_rewrite_system_prompt
 from prompt_improve.features.target import (
     GENERIC_TARGET,
@@ -27,7 +28,6 @@ from prompt_improve.shared.config import (
     OLLAMA_URL,
 )
 from prompt_improve.shared.ollama import choose_ollama_model_for_role
-from prompt_improve.shared.paths import project_hint_for_prompt
 
 _DEBUG = os.environ.get("OLLAMA_IMPROVE_DEBUG", "0") == "1"
 

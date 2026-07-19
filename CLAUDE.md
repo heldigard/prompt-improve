@@ -25,7 +25,8 @@ src/prompt_improve/
     improve.py   LLM calls (ollama clarify/rewrite, cloud cascade, router)
     clean.py     output cleaning, bullet trimming, soften absolutes
     rules.py     rule-based suggestions, system prompts
-    hints.py     project hints, continuation context
+    hints.py     project hints composition, continuation context
+    ecosystem.py ecosystem skill hints (prompt → preferred-stack guideline)
     target/      receiving CLI/model profile + prompt shaping (profile, shape)
   command.py     main() entry point
 scripts/

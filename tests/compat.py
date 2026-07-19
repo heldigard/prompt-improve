@@ -24,11 +24,11 @@ from prompt_improve.shared.cache import (  # noqa: F401
 from prompt_improve.shared.paths import (  # noqa: F401
     _existing_path_correction,
     project_hint as _project_hint,
-    project_hint_for_prompt as _project_hint_for_prompt,
     project_current_task_line,
     current_task_hint_line,
     should_include_task_hint,
 )
+from prompt_improve.features.hints import project_hint_for_prompt as _project_hint_for_prompt  # noqa: F401
 from prompt_improve.features.detect import (  # noqa: F401
     depends_on_conversation_context,
     detect_trivial,

@@ -102,9 +102,7 @@ def test_has_concrete_target_true():
     assert ip.has_concrete_target(
         "revisa prompt-improve, smart-trim y ollama-client y corrige sus contratos"
     )
-    assert ip.has_concrete_target(
-        "optimize a slow PostgreSQL query with explain analyze indexes"
-    )
+    assert ip.has_concrete_target("optimize a slow PostgreSQL query with explain analyze indexes")
     assert ip.has_concrete_target(
         "mejora el ecosistema cross-cli para ahorrar tokens sin perder calidad"
     )

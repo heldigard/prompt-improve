@@ -8,10 +8,10 @@ from __future__ import annotations
 
 from pathlib import Path
 
+from prompt_improve.features.hints import project_hint_for_prompt
 from prompt_improve.shared.paths import (
     _existing_path_correction,
     _topic_hint,
-    project_hint_for_prompt,
 )
 
 
@@ -89,8 +89,7 @@ def test_topic_hint_ignores_generic_spanish_project_request(tmp_path: Path) -> N
     bank.mkdir()
     _write_index(
         bank,
-        "## Topics\n"
-        "- [Tested Models](tested-models.md) — modelos probados para el proyecto\n",
+        "## Topics\n- [Tested Models](tested-models.md) — modelos probados para el proyecto\n",
     )
 
     assert _topic_hint("mejora este proyecto", tmp_path) == ""
