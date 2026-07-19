@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "prompt-improve"
-version = "17.1.0"
+version = "17.2.0"
 description = "LLM-powered prompt improvement hook for Claude Code (Ollama-local, cloud fallback)."
 readme = "README.md"
 requires-python = ">=3.11"

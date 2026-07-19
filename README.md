@@ -86,6 +86,7 @@ agent/model that will receive it. Each family gets **three layers** of guidance:
 | **Kimi** | Agentic Markdown, single-agent | Don't delegate to subagents (Kimi forces its model on all subagents) |
 | **MiMo** | Explicit numbered steps | Number every step; avoid open-ended discretion |
 | **Gemma** | Short, flat, strongly labeled | (compact-model constraints are the format) |
+| **Grok** (xAI Grok Build / grok-4.5) | GitHub-flavored Markdown, one imperative objective, acceptance criteria | YOLO/always-approve: cap scope; prefer reversible local edits; parallelize independent reads |
 | **Generic** | Plain flat Markdown | (none) |
 
 Detection uses hook payload fields first, then environment. Explicit model IDs
@@ -93,12 +94,14 @@ beat CLI fallback, so `MiniMax-M3` launched through Codex still receives MiniMax
 guidance instead of GPT guidance. Common env inputs include
 `PROMPT_IMPROVE_TARGET_CLI`, `PROMPT_IMPROVE_TARGET_MODEL`, `ANTHROPIC_MODEL`,
 `CLAUDE_AGENT_IDENTITY`, `CODEX_MODEL`, `OPENAI_MODEL`, `GEMINI_MODEL`,
-`DEEPSEEK_MODEL`, `QWEN_MODEL`, `KIMI_MODEL`, `MINIMAX_MODEL`, and `MODEL_NAME`.
+`DEEPSEEK_MODEL`, `QWEN_MODEL`, `KIMI_MODEL`, `MINIMAX_MODEL`, `GROK_MODEL`,
+`XAI_MODEL`, and `MODEL_NAME`.
 For Codex wrappers, setting `PROMPT_IMPROVE_TARGET_CLI=codex` and
 `PROMPT_IMPROVE_TARGET_MODEL=gpt-5.6-terra` gives deterministic routing.
 Native Claude Code hooks are recognized from their `transcript_path` payload
 field even when active-model metadata is absent. `CLAUDECODE` / `CLAUDE_CODE_*`
-remain wrapper fallbacks.
+remain wrapper fallbacks. Native Grok Build sessions are recognized from
+`GROK_AGENT` / `GROK_MODEL` / `XAI_MODEL` (or `PROMPT_IMPROVE_TARGET_CLI=grok`).
 The complete improvement attempt shares a 20-second wall-clock budget by default
 (`OLLAMA_IMPROVE_TOTAL_TIMEOUT`) across cloud/local routing and the optional
 rewrite→clarify retry. This remains below the pipeline child's 22-second ceiling,
@@ -130,3 +133,12 @@ prompt-shape knowledge (the *what*):
 - `__init__.py` — re-exports the stable public API.
 
 Adding a new family = one `SHAPES` entry + one matcher in `profile.py`.
+
+## Native Linux notes
+
+On Ubuntu with a systemd-managed Ollama unit the hook starts the daemon via
+`systemctl` (user unit first, then system) before falling back to a detached
+`ollama serve`. The available-model tail used when preferred improve-chain
+tags are missing excludes embedding-only models (`nomic-embed-*`, `bge-*`,
+`embedding*`) so a miss does not burn the 20s wall-clock budget on a non-chat
+tag.

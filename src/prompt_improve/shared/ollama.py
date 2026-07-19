@@ -22,6 +22,20 @@ from prompt_improve.shared.config import (
 
 MAX_OLLAMA_RESPONSE_BYTES = 1_048_576
 
+# Models that only produce vectors must never enter the improve chain tail.
+# When preferred chat models are unavailable, the previous logic appended every
+# name from /api/tags — including nomic-embed-text / bge-m3 / embeddinggemma —
+# which then "succeeds" with unusable garbage under the shared wall-clock budget.
+_NON_CHAT_MODEL_RE = re.compile(
+    r"(?:^|[:/_.-])(?:embed(?:ding)?|bge[-_]?|e5[-_]?|minilm|nomic[-_]?embed|gte[-_]?)",
+    re.IGNORECASE,
+)
+
+
+def _is_chat_model(name: str) -> bool:
+    """True when the Ollama tag looks usable for chat completion (not embeddings)."""
+    return bool(name) and _NON_CHAT_MODEL_RE.search(name) is None
+
 
 def _get_json(path: str, timeout: float) -> dict | None:
     try:
@@ -203,8 +217,9 @@ def choose_ollama_model_for_role(role: str) -> tuple[str | None, list[str]]:
 
     # Sorted so the leftover tail is deterministic — ``available`` is a set,
     # and set-iteration order would otherwise vary between hook invocations.
+    # Skip embedding-only tags: they burn the shared timeout without improving.
     for model in sorted(available):
-        if model not in seen:
+        if model not in seen and _is_chat_model(model):
             all_ordered.append(model)
             seen.add(model)
 

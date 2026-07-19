@@ -33,6 +33,9 @@ _TARGET_SCRUB_VARS = (
     "MINIMAX_MODEL",
     "ZAI_MODEL",
     "GLM_MODEL",
+    "GROK_MODEL",
+    "XAI_MODEL",
+    "GROK_AGENT",
     "MODEL_NAME",
     "MODEL_ID",
     "MODEL",
@@ -80,6 +83,9 @@ def test_target_profile_classifies_proxy_shell_models():
     assert profile_for_model("deepseek-v4-pro[1m]", "dseek").family == "deepseek"
     assert profile_for_model("glm-5.2[1m]", "zai").family == "glm"
     assert profile_for_model("qwen3.7-max[1m]", "qwen").family == "qwen"
+    assert profile_for_model("grok-4.5", "grok").family == "grok"
+    assert profile_for_model("grok-4.5", "grok").style == "grok-4.5-agentic"
+    assert profile_for_model("x-ai/grok-4.5", "codex").family == "grok"
 
 
 def test_target_profile_explicit_model_beats_codex_cli_fallback():
@@ -99,6 +105,8 @@ def test_target_profile_classifies_proxy_cli_without_model():
     assert profile_for_model("unknown", "qwen").family == "qwen"
     assert profile_for_model("unknown", "zai").family == "glm"
     assert profile_for_model("unknown", "mimo").family == "mimo"
+    assert profile_for_model("unknown", "grok").family == "grok"
+    assert profile_for_model("unknown", "grok-build").family == "grok"
 
 
 def test_target_profile_reads_common_model_envs():
@@ -172,11 +180,35 @@ def test_target_profile_uses_orchestration_pipeline_caller(monkeypatch):
         ("codex", "openai-gpt"),
         ("gemini", "gemini"),
         ("antigravity", "gemini"),
+        ("grok", "grok"),
     ):
         monkeypatch.setenv("CLI_ORCHESTRATION_CALLER", caller)
         target = target_profile_from_request({"hook_event_name": "UserPromptSubmit"})
         assert target.cli == caller
         assert target.family == family
+
+
+def test_target_profile_detects_grok_agent_env(monkeypatch):
+    """Native Grok Build sessions export GROK_AGENT (often '1').
+
+    Without this harness marker the hook falls through to generic Markdown and
+    wastes the target-aware shaping path that every other CLI already gets.
+    """
+    from prompt_improve.features.target import target_profile_from_request
+
+    _scrub_target_env(monkeypatch)
+    monkeypatch.setenv("GROK_AGENT", "1")
+    target = target_profile_from_request({"hook_event_name": "UserPromptSubmit"})
+    assert target.cli == "grok"
+    assert target.family == "grok"
+    assert "grok" in target.style
+
+    monkeypatch.delenv("GROK_AGENT", raising=False)
+    monkeypatch.setenv("GROK_MODEL", "grok-4.5")
+    target = target_profile_from_request({})
+    assert target.family == "grok"
+    assert target.model == "grok-4.5"
+    assert target.style == "grok-4.5-agentic"
 
 
 def test_target_profile_detects_claude_from_native_hook_payload(monkeypatch):
@@ -299,6 +331,20 @@ def test_build_messages_uses_gemini_component_guidance():
     assert "concise, direct instructions" in system
 
 
+def test_build_messages_uses_grok_markdown_guidance():
+    import prompt_improve.features.improve as m
+    from prompt_improve.features.target import profile_for_model
+
+    target = profile_for_model("grok-4.5", "grok")
+    system, _ = m._build_messages("rewrite", "fix the bug", None, target)
+    assert "Grok" in system
+    assert "GitHub-flavored" in system
+    assert "always-approve" in system
+    assert "Grok 4.5" in system
+    # Markdown path — not Claude XML section tags as primary structure.
+    assert "<task>" not in system
+
+
 _FAMILY_CASES = [
     ("claude", "claude-opus-4-8", "claude"),
     ("openai-gpt", "gpt-5.5", "codex"),
@@ -310,6 +356,7 @@ _FAMILY_CASES = [
     ("kimi", "kimi-2.7-code", "kimi"),
     ("mimo", "mimo-2.5-pro", "mimo"),
     ("gemma", "gemma-4-12b-it-qat", "generic"),
+    ("grok", "grok-4.5", "grok"),
 ]
 
 
@@ -340,6 +387,7 @@ def test_behavior_hints_present_per_family():
         "claude": "over-exploration",
         "openai-gpt": "FILES",
         "gemini": "dilutes focus",
+        "grok": "always-approve",
     }
     family_to_case = {f: (m, c) for f, m, c in _FAMILY_CASES}
     for family, keyword in behavior_keywords.items():

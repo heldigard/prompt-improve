@@ -1,7 +1,7 @@
 # Project: prompt-improve
 
-`prompt-improve` — LLM-powered prompt improvement hook for Claude Code (and
-Codex/Gemini via symlink). Graduated from the monolithic
+`prompt-improve` — LLM-powered prompt improvement hook for Claude Code, Codex,
+Gemini/Antigravity, and Grok Build (shared shim). Graduated from the monolithic
 `~/.claude/hooks/prompt-improve.py` (1244L) into its own vertical-slice package,
 mirroring the `codeq` and `smart-trim` project layouts.
 

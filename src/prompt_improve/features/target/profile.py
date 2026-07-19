@@ -96,6 +96,9 @@ _CLI_FAMILY_STYLE: dict[str, tuple[str, str]] = {
     "agy": ("gemini", "component-blocks"),
     "antigravity": ("gemini", "component-blocks"),
     "gemini": ("gemini", "component-blocks"),
+    "grok": ("grok", "grok-markdown"),
+    "grok-build": ("grok", "grok-markdown"),
+    "xai": ("grok", "grok-markdown"),
     "qwen": ("qwen", "literal-markdown"),
     "qwenc": ("qwen", "literal-markdown"),
     "dseek": ("deepseek", "explicit-steps"),
@@ -147,6 +150,14 @@ def profile_for_model(model: str, cli: str | None = None) -> TargetProfile:
         return TargetProfile(clean_cli, clean_model, "glm", _version(lower), "explicit-steps")
     if _looks_like_gemma(lower):
         return TargetProfile(clean_cli, clean_model, "gemma", _version(lower), "compact-markdown")
+    if _looks_like_grok(lower) or clean_cli in ("grok", "grok-build", "xai"):
+        return TargetProfile(
+            clean_cli if clean_cli != "generic" else "grok",
+            clean_model,
+            "grok",
+            _version(lower),
+            _grok_style(lower),
+        )
     if _looks_like_openai(lower) or clean_cli == "codex":
         return TargetProfile(
             clean_cli, clean_model, "openai-gpt", _version(lower), _openai_style(lower)
@@ -223,6 +234,8 @@ def _model_from_env() -> str | None:
         os.environ.get("MINIMAX_MODEL"),
         os.environ.get("ZAI_MODEL"),
         os.environ.get("GLM_MODEL"),
+        os.environ.get("GROK_MODEL"),
+        os.environ.get("XAI_MODEL"),
         os.environ.get("MODEL_NAME"),
         os.environ.get("MODEL_ID"),
         os.environ.get("MODEL"),
@@ -255,6 +268,11 @@ def _cli_from_env_or_model(model: str | None) -> str | None:
         return "claude"
     if os.environ.get("AGY_SETTINGS"):
         return "antigravity"
+    # Grok Build sets GROK_AGENT in interactive sessions (value may be "1" or a
+    # custom agent name). Prefer this over model-string heuristics so hooks that
+    # inherit parent shells still shape for Grok rather than generic Markdown.
+    if os.environ.get("GROK_AGENT") or os.environ.get("GROK_MODEL") or os.environ.get("XAI_MODEL"):
+        return "grok"
     lower = (model or "").lower()
     if _looks_like_claude(lower):
         return "claude"
@@ -262,6 +280,8 @@ def _cli_from_env_or_model(model: str | None) -> str | None:
         return "antigravity"
     if _looks_like_openai(lower):
         return "codex"
+    if _looks_like_grok(lower):
+        return "grok"
     if _looks_like_minimax(lower):
         return "mini"
     if _looks_like_kimi(lower):
@@ -338,6 +358,11 @@ def _looks_like_gemma(text: str) -> bool:
     return "gemma" in text
 
 
+def _looks_like_grok(text: str) -> bool:
+    # x-ai/grok-4.5 OpenRouter slug, grok-4.5 Build id, super-grok, grok-build.
+    return "grok" in text or "x-ai" in text or bool(re.search(r"\bxai\b", text))
+
+
 # ---- helpers ---------------------------------------------------------------
 
 
@@ -390,6 +415,14 @@ def _kimi_style(text: str) -> str:
     if "2.7" in text or "k2.7" in text:
         return "kimi-k2.7-code"
     return "agentic-markdown"
+
+
+def _grok_style(text: str) -> str:
+    if "4.5" in text or "4-5" in text:
+        return "grok-4.5-agentic"
+    if "build" in text:
+        return "grok-build-agentic"
+    return "grok-markdown"
 
 
 def _version(text: str) -> str:

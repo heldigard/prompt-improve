@@ -153,6 +153,54 @@ def test_systemctl_start_returns_false_when_unit_missing(monkeypatch):
     assert omod._systemctl_start_ollama() is False
 
 
+def test_is_chat_model_filters_embedding_tags():
+    import prompt_improve.shared.ollama as omod
+
+    assert omod._is_chat_model("cryptidbleh/gemma4-claude-opus-4.6:latest") is True
+    assert omod._is_chat_model("hf.co/TeichAI/Qwen3.5-9B-Fable-5-v1-GGUF:Q4_K_M") is True
+    assert omod._is_chat_model("nomic-embed-text:latest") is False
+    assert omod._is_chat_model("bge-m3:latest") is False
+    assert omod._is_chat_model("embeddinggemma:latest") is False
+    assert omod._is_chat_model("") is False
+
+
+def test_choose_ollama_model_skips_embedding_tail(monkeypatch):
+    """When only embeddings remain after the preferred chain, return empty rather
+    than burning the hook budget on a non-chat model."""
+    import prompt_improve.shared.ollama as omod
+
+    monkeypatch.setattr(
+        omod,
+        "available_ollama_models",
+        lambda: ["nomic-embed-text:latest", "bge-m3:latest", "embeddinggemma:latest"],
+    )
+    monkeypatch.setattr(omod, "OLLAMA_MODEL_CANDIDATES", ["missing-chat:latest"])
+    monkeypatch.setattr(omod, "_ROLE_MODEL_MAP", {"prompt_rewrite": ["missing-chat:latest"]})
+    primary, fallbacks = omod.choose_ollama_model_for_role("prompt_rewrite")
+    assert primary is None
+    assert fallbacks == []
+
+
+def test_choose_ollama_model_keeps_chat_tail(monkeypatch):
+    import prompt_improve.shared.ollama as omod
+
+    monkeypatch.setattr(
+        omod,
+        "available_ollama_models",
+        lambda: [
+            "nomic-embed-text:latest",
+            "cryptidbleh/gemma4-claude-opus-4.6:latest",
+            "bge-m3:latest",
+        ],
+    )
+    monkeypatch.setattr(omod, "OLLAMA_MODEL_CANDIDATES", ["missing-preferred:latest"])
+    monkeypatch.setattr(omod, "_ROLE_MODEL_MAP", {"prompt_rewrite": ["missing-preferred:latest"]})
+    primary, fallbacks = omod.choose_ollama_model_for_role("prompt_rewrite")
+    assert primary == "cryptidbleh/gemma4-claude-opus-4.6:latest"
+    assert "nomic-embed-text:latest" not in fallbacks
+    assert "bge-m3:latest" not in fallbacks
+
+
 def test_debug_noop_when_disabled():
     import prompt_improve.features.improve as m
 

@@ -134,6 +134,22 @@ def _variant_guidance(target: TargetProfile) -> str:
             "Version note: Kimi K2.7 Code is code-focused with thinking behavior "
             "already on; keep coding tasks self-contained and acceptance-driven."
         )
+    if target.family == "grok":
+        notes = []
+        if "4.5" in lower or "4-5" in lower or target.style == "grok-4.5-agentic":
+            notes.append(
+                "Version note: Grok 4.5 (Grok Build, 500K ctx) responds best to "
+                "precise technical prose with complete sentences, explicit "
+                "acceptance criteria, and parallel-safe independent tool steps. "
+                "Do not request visible chain-of-thought; internal reasoning is on."
+            )
+        elif target.cli in ("grok", "grok-build", "xai") or "build" in lower:
+            notes.append(
+                "Version note: Grok Build is an agentic coding CLI with skills, "
+                "MCP tools, and worktree isolation — name files, constraints, and "
+                "the first deliverable explicitly."
+            )
+        return " ".join(notes)
     return ""
 
 
@@ -298,6 +314,28 @@ SHAPES: dict[str, FamilyShape] = {
         ),
         clarify=("Target model profile: compact local model. Keep bullets short and concrete."),
         # No separate behavior: the compact-model constraints ARE the format guidance.
+    ),
+    "grok": FamilyShape(
+        family="grok",
+        rewrite=(
+            "Target model profile: Grok (xAI Grok Build). Output clean GitHub-flavored "
+            "Markdown with a single imperative objective, concrete file/path anchors "
+            "when known, constraints, and acceptance criteria. Prefer complete "
+            "technical sentences over terse fragments or XML. Keep human-visible "
+            "text in the user's language ({labels})."
+        ),
+        clarify=(
+            "Target model profile: Grok (xAI Grok Build). Use 1-3 Markdown bullets "
+            "that name concrete actions, verification, and stopping rules. Prefer "
+            "backticks for paths/identifiers; do not use XML tags."
+        ),
+        behavior=(
+            "Mitigation: Grok Build often runs in always-approve/yolo mode — state "
+            "ONE clear objective plus acceptance checks so scope does not sprawl. "
+            "Prefer reversible local edits; require confirmation only for "
+            "destructive or shared-state actions. Parallelize independent reads; "
+            "do not invent tools the receiving CLI does not expose."
+        ),
     ),
     "generic": FamilyShape(
         family="generic",
