@@ -15,6 +15,31 @@ _PATH_LITERAL_RE = re.compile(r"(?<![\w.])(?:~/|/)[A-Za-z0-9._+@:-]+(?:/[A-Za-z0
 # _PATH_LITERAL_RE as if they were absolute paths, so they must be stripped
 # before the unsupported-paths check.
 _XML_TAG_RE = re.compile(r"</?[A-Za-z][\w.-]*\s*/?>")
+
+# Chain-model reasoning blocks. The available-model TAIL (any installed chat
+# model) plus the Qwen3/GLM family in the default chain emit these even with
+# think=False: <think>, <reasoning>, <reflection>, and the channel-style
+# <|think|>/<|channel|> tokens. Each pattern also matches an UNCLOSED block
+# (…|$) because num_predict/timeout truncation can cut the model mid-thought,
+# and the previous closed-only regex let that leak into the cleaned bullets.
+_REASONING_BLOCK_RES: tuple[re.Pattern[str], ...] = (
+    re.compile(r"<think\b[^>]*>.*?(</think\s*>|$)", re.S | re.I),
+    re.compile(r"<reasoning\b[^>]*>.*?(</reasoning\s*>|$)", re.S | re.I),
+    re.compile(r"<reflection\b[^>]*>.*?(</reflection\s*>|$)", re.S | re.I),
+    re.compile(r"<\|think\|>.*?(<\|/think\|>|$)", re.S | re.I),
+    re.compile(r"<\|channel\|>.*?(<\|channel\|>|$)", re.S | re.I),
+)
+_LEAD_DONE_THINKING_RE = re.compile(r"(?is)^.*?done thinking\.\s*")
+
+
+def _strip_reasoning(text: str) -> str:
+    """Drop chain-model reasoning blocks (closed or truncated) and the
+    ``done thinking.`` lead preamble before bullet/spec extraction."""
+    for pattern in _REASONING_BLOCK_RES:
+        text = pattern.sub("", text)
+    return _LEAD_DONE_THINKING_RE.sub("", text)
+
+
 _UNSUPPORTED_TECH_RE = re.compile(
     r"\b(?:codescan|golang|python|django|fastapi|java|spring(?: boot)?|javascript|"
     r"typescript|react|angular|vue|rust|kubernetes|docker|terraform|postgresql|"
@@ -110,8 +135,7 @@ def clean_response(text: str, original: str) -> str | None:
     text = text.strip()
     if not text:
         return None
-    text = re.sub(r"<think>.*?</think>", "", text, flags=re.DOTALL | re.IGNORECASE)
-    text = re.sub(r"(?is)^.*?done thinking\.\s*", "", text)
+    text = _strip_reasoning(text)
     text = re.sub(r"^```[\w]*\n?|```$", "", text, flags=re.MULTILINE).strip()
     text = re.sub(
         r"^(Improved prompt|Prompt mejorado|Sugerencias|Suggestions|Clarifications?):\s*",
@@ -143,8 +167,7 @@ def clean_rewrite(text: str, original: str) -> str | None:
     text = text.strip()
     if not text:
         return None
-    text = re.sub(r"<think>.*?</think>", "", text, flags=re.DOTALL | re.IGNORECASE)
-    text = re.sub(r"(?is)^.*?done thinking\.\s*", "", text)
+    text = _strip_reasoning(text)
     text = re.sub(r"^```[\w]*\n?|```$", "", text, flags=re.MULTILINE).strip()
     text = re.sub(
         r"^(Here is|Aqu[ií] est[aá]|Sure|Claro|Por supuesto|Rewritten prompt|Prompt reescrito)[:!.]?\s*",

@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import pytest
+
 from tests import compat as ip
 
 
@@ -184,6 +186,35 @@ def test_clean_response_strips_think_tags():
     assert result is not None
     assert "<think>" not in result
     assert "Check the auth" in result
+
+
+@pytest.mark.parametrize(
+    "block",
+    [
+        "<reasoning>let me reason</reasoning>\n- Verify the parser",
+        "<reflection>meta</reflection>\n- Check the index",
+        "<|think|>channel think<|/think|>\n- Inspect the hook",
+    ],
+)
+def test_clean_response_strips_closed_reasoning_variants(block: str) -> None:
+    result = ip._clean_response(block, "original")
+    assert result is not None
+    assert "<reasoning>" not in result
+    assert "<reflection>" not in result
+    assert "<|think" not in result
+    assert result.startswith("- ")
+
+
+def test_clean_response_unclosed_think_is_discarded() -> None:
+    # num_predict/timeout cut the model mid-thought: no closing tag, no usable
+    # answer. The old closed-only regex left the raw <think> prose as a bullet;
+    # now the whole block is dropped and the cleaner returns None (passthrough).
+    assert ip._clean_response("<think>truncated without close", "original") is None
+
+
+def test_clean_rewrite_unclosed_think_is_discarded() -> None:
+    raw = "<think>reasoning that got cut off by the token cap\n<task>Fix parser</task>"
+    assert ip._clean_rewrite(raw, "fix the parser") is None
 
 
 def test_clean_response_limits_to_three_bullets():
