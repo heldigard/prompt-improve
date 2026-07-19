@@ -23,3 +23,6 @@
 
 ## 2026-07-04
 - Graduated monolith → package; role-based routing; public GitHub `heldigard/prompt-improve`.
+- 2026-07-19T01:42:11Z | status:completed | session:gen:b5be76ba-6819-40eb-8088-60dcc35c1483 | claude: Refresh `SHAPES` behavior lines when `~/.claude/rules/model-specific.md`...
+- 2026-07-19T15:52:02Z | CLI help lists diagnostic subcommands; SystemExit propagates return codes; helpers docstring fixed; uv tool 17.2.0 reinstalled
+- 2026-07-19T15:56:24Z | Committed CLI help + SystemExit exit-code fix; package reinstalled at 17.2.0.

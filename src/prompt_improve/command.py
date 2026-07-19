@@ -76,7 +76,12 @@ def _try_improve(
 
 
 def _handle_cli_flags() -> bool:
-    """Handle --version/--help early so a TTY stdin read never blocks. True when handled."""
+    """Handle --version/--help early so a TTY stdin read never blocks. True when handled.
+
+    Diagnostic subcommands (improve/classify/detect/target) are delegated to
+    ``prompt_improve.cli`` and exit via ``SystemExit`` so their return codes
+    reach the process (console script uses ``sys.exit(main())``).
+    """
     if len(sys.argv) <= 1:
         return False
     first_arg = sys.argv[1].strip()
@@ -89,8 +94,12 @@ def _handle_cli_flags() -> bool:
         print("prompt-improve — LLM-powered prompt improvement hook")
         print()
         print("Usage:")
-        print("  python3 -m prompt_improve.command [prompt]")
-        print("  Or pass a JSON payload containing 'prompt' and optionally 'cwd' via stdin.")
+        print("  prompt-improve [prompt]                 # direct CLI improve")
+        print('  prompt-improve improve --prompt "..."  # full pipeline JSON')
+        print('  prompt-improve detect --prompt "..."')
+        print('  prompt-improve classify --prompt "..." [--mode rewrite|clarify]')
+        print("  prompt-improve target")
+        print("  # Or pass JSON with 'prompt' (and optional 'cwd') via stdin (hook mode).")
         print()
         print("Options:")
         print("  -v, --version  Show version")
@@ -99,8 +108,7 @@ def _handle_cli_flags() -> bool:
     if first_arg in {"improve", "classify", "detect", "target"}:
         from prompt_improve.cli import main as cli_main
 
-        cli_main(sys.argv[1:])
-        return True
+        raise SystemExit(cli_main(sys.argv[1:]))
     return False
 
 

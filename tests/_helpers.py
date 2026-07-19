@@ -37,7 +37,8 @@ def _seq_responder(seq):
 def _patch_runner():
     """Install a fake ollama_client + controlled model picker on the loaded module.
 
-    Returns (mod, calls_list, fake_chat, saved). Caller restores in finally.
+    Returns ``(mod, calls, saved, ReqErr, Unavail, fake_chat)``.
+    Caller restores via ``_restore(mod, saved)`` in ``finally``.
     """
     import types
 

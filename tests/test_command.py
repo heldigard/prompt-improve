@@ -398,7 +398,8 @@ def test_command_main_help_flags_print_usage_and_return_early():
         out = _run_main_via_argv(flag)
         assert "prompt-improve — LLM-powered prompt improvement hook" in out
         assert "Usage:" in out
-        assert "python3 -m prompt_improve.command [prompt]" in out
+        assert "prompt-improve [prompt]" in out
+        assert "prompt-improve detect" in out
         assert "hookSpecificOutput" not in out
 
 
