@@ -258,6 +258,7 @@ def test_shape_by_cli_overrides_model_family(monkeypatch):
     # direct helper: CLI drives family; unknown CLI falls back to generic
     assert profile_for_cli("claude", "glm-5.2[1m]").family == "claude"
     assert profile_for_cli("codex", "glm-5.2[1m]").family == "openai-gpt"
+    assert profile_for_cli("qwenc", "unknown").family == "generic"
     assert profile_for_cli("weird-cli", "x").family == "generic"
 
 

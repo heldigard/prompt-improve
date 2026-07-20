@@ -100,7 +100,6 @@ _CLI_FAMILY_STYLE: dict[str, tuple[str, str]] = {
     "grok-build": ("grok", "grok-markdown"),
     "xai": ("grok", "grok-markdown"),
     "qwen": ("qwen", "literal-markdown"),
-    "qwenc": ("qwen", "literal-markdown"),
     "dseek": ("deepseek", "explicit-steps"),
     "deepseek": ("deepseek", "explicit-steps"),
     "mini": ("minimax", "agentic-markdown"),
