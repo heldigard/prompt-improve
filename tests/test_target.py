@@ -422,6 +422,8 @@ def test_deepseek_guidance_does_not_request_hidden_cot():
         profile_for_model("deepseek-v4-flash", "dseek"), "rewrite", "English"
     )
     assert "do not request hidden chain-of-thought" in guidance
+    assert "instruct/agentic model" in guidance
+    assert "DeepSeek is a reasoning model" not in guidance
 
 
 def test_target_profile_detects_deepseek_r1_as_reasoner():
@@ -451,6 +453,7 @@ def test_deepseek_r1_guidance_is_reasoner_specific():
     assert "do NOT use a system prompt" in guidance
     assert "zero-shot" in guidance
     assert "temperature 0.5-0.7" in guidance
+    assert "instruct/agentic model" not in guidance
     # R1 must not get the V4 variant note (distinct lineage)
     assert "DeepSeek V4 is strong for coding" not in guidance
 

@@ -115,6 +115,11 @@ def _cache_mode(mode: str, target: TargetProfile) -> str:
     return f"{mode}:{target.cache_key}"
 
 
+def _cloud_cache_mode(mode: str, target: TargetProfile, cloud_model: str) -> str:
+    """Partition hard-route cache entries when the configured cloud model changes."""
+    return f"{_cache_mode(mode, target)}:cloud:{cloud_model}"
+
+
 def _build_messages(
     mode: str,
     prompt: str,
@@ -270,6 +275,18 @@ def route_and_improve(
         cloud_model = (
             os.environ.get("OLLAMA_IMPROVE_CLOUD_MODEL", "").strip() or "deepseek/deepseek-v4-flash"
         )
+        # Hard prompts bypass call_ollama[_rewrite], which normally owns the
+        # cache lookup/save path. Check the same target-specific key here so a
+        # repeated security/architecture prompt does not pay for another cloud
+        # call merely because cloud is the preferred first route. Include the
+        # improving cloud model: an explicit model override must not reuse a
+        # result produced by the previous provider/model.
+        cache_mode = _cloud_cache_mode(mode, target, cloud_model)
+        if CLOUD_FALLBACK:
+            cached = load_cached(prompt, cache_mode, cwd)
+            if cached:
+                metrics.record("cache:hit")
+                return cached
         _debug(f"hard prompt → cloud-first ({cloud_model})")
         result = call_cloud_cascade(
             prompt,
@@ -280,6 +297,7 @@ def route_and_improve(
             deadline=deadline,
         )
         if result:
+            save_cached(prompt, cache_mode, result[0], result[1], cwd)
             return result
         _debug("cloud-first failed, falling back to local")
     _debug(f"trying local ({mode})")

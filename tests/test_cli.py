@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 import subprocess
 import sys
+from argparse import Namespace
 from pathlib import Path
 
 
@@ -54,6 +55,55 @@ def test_cli_target_returns_profile() -> None:
     payload = json.loads(out)
     assert "cli" in payload
     assert "family" in payload
+
+
+def test_cli_target_explicit_model_overrides_cli_family() -> None:
+    rc, out = _run("target", "--cli", "codex", "--model", "MiniMax-M3")
+    assert rc == 0
+    payload = json.loads(out)
+    assert payload["cli"] == "codex"
+    assert payload["family"] == "minimax"
+    assert payload["model"] == "MiniMax-M3"
+
+
+def test_cmd_improve_forwards_explicit_target(monkeypatch, capsys) -> None:
+    import prompt_improve.cli as cli
+    import prompt_improve.command as command
+
+    captured = {}
+    monkeypatch.setenv("PROMPT_IMPROVE_TARGET_CLI", "claude")
+    monkeypatch.setenv("PROMPT_IMPROVE_TARGET_MODEL", "claude-sonnet-5")
+
+    def fake_try(prompt, mode, cwd, target):
+        captured["target"] = target
+        return "improved", "ollama:test", mode
+
+    monkeypatch.setattr(command, "_try_improve", fake_try)
+    args = Namespace(
+        prompt="improve this integration",
+        cwd=None,
+        mode="rewrite",
+        cli="codex",
+        model="MiniMax-M3",
+    )
+
+    assert cli._cmd_improve(args) == 0
+    assert json.loads(capsys.readouterr().out)["improved"] == "improved"
+    assert captured["target"].cli == "codex"
+    assert captured["target"].family == "minimax"
+
+
+def test_cmd_target_flags_win_over_inherited_target_env(monkeypatch, capsys) -> None:
+    import prompt_improve.cli as cli
+
+    monkeypatch.setenv("PROMPT_IMPROVE_TARGET_CLI", "claude")
+    monkeypatch.setenv("PROMPT_IMPROVE_TARGET_MODEL", "claude-sonnet-5")
+
+    assert cli._cmd_target(Namespace(cli="codex", model="gpt-5.6-sol")) == 0
+    payload = json.loads(capsys.readouterr().out)
+    assert payload["cli"] == "codex"
+    assert payload["model"] == "gpt-5.6-sol"
+    assert payload["family"] == "openai-gpt"
 
 
 def test_cli_version() -> None:

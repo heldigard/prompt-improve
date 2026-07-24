@@ -6,6 +6,7 @@ import io
 import json
 import os
 import sys
+import tomllib
 from pathlib import Path
 
 import pytest
@@ -15,6 +16,15 @@ from tests import compat as ip
 EVALS = Path(__file__).resolve().parent.parent / "evals" / "prompt-improve.json"
 CANONICAL_SHIM = Path(__file__).resolve().parent.parent / "prompt-improve.py"
 LIVE_SHIM = Path.home() / ".claude" / "hooks" / "prompt-improve.py"
+
+
+def test_package_version_matches_pyproject():
+    from prompt_improve import __version__
+
+    metadata = tomllib.loads(
+        (Path(__file__).resolve().parent.parent / "pyproject.toml").read_text(encoding="utf-8")
+    )
+    assert metadata["project"]["version"] == __version__
 
 
 def _ollama_available() -> bool:

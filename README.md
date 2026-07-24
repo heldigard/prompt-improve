@@ -20,21 +20,29 @@ actionable prompts and only rewrites or clarifies genuinely underspecified input
 - **Tool-neutral shaping**: the receiving CLI chooses tools from its own live
   capabilities; the improver does not prime unrelated tools into the task
 - **Deterministic continuation**: bare "continua" prompts get memory-based expansion (no LLM)
-- **Cached**: 5-minute TTL cache per project scope and target model profile
+- **Cached**: 5-minute TTL cache per project scope and target model profile;
+  hard-route cloud entries are also partitioned by the improving cloud model
 
 ## Install
 
-> **Ubuntu 26 / PEP 668:** system Python is externally managed. Prefer `uv tool install --force --editable ~/PROJECT` for PATH tools, or `python3 -m pip install --user --break-system-packages -e .` for user-site hooks. Or use a project venv.
-
+> **Ubuntu 26 / PEP 668:** system Python is externally managed. Prefer an
+> isolated `uv` tool install for the PATH command, or use a project venv.
 
 ```bash
-pip install -e ~/prompt-improve
+uv tool install --force --editable ~/prompt-improve
 ```
 
 ## Test
 
 ```bash
-cd ~/prompt-improve && python3 -m pytest tests/ -q
+cd ~/prompt-improve
+uv venv
+uv pip install --python .venv/bin/python -e '.[test]'
+.venv/bin/pytest
+.venv/bin/ruff check .
+.venv/bin/ruff format --check .
+.venv/bin/mypy src
+.venv/bin/python -m build
 ```
 
 ## How it works
@@ -59,11 +67,31 @@ the hook from loading.
 
 | Variable | Default | Accepted values |
 |---|---:|---|
+| `OLLAMA_IMPROVE_MODE` | `auto` | `auto`, `rewrite`, or `clarify` |
 | `OLLAMA_IMPROVE_TIMEOUT` | `45.0` | Positive finite seconds per primary model attempt |
 | `OLLAMA_IMPROVE_TOTAL_TIMEOUT` | `20.0` | Positive finite seconds shared by the whole cloud/local and rewrite/clarify attempt |
+| `OLLAMA_IMPROVE_AUTOSTART` | `1` | `0` disables best-effort Ollama startup |
+| `OLLAMA_IMPROVE_MODELS` | benchmarked four-model chain | Comma-separated global model chain |
+| `OLLAMA_IMPROVE_ROLE_PROMPT_REWRITE` | global chain | Comma-separated rewrite-specific chain |
+| `OLLAMA_IMPROVE_ROLE_PROMPT_CLARIFY` | global chain | Comma-separated clarify-specific chain |
+| `OLLAMA_IMPROVE_CLOUD_FALLBACK` | `1` | `0` disables all cloud fallback |
+| `OLLAMA_IMPROVE_CLOUD_INTELLIGENCE` | `1` | `0` disables cloud-first hard-prompt routing |
+| `OLLAMA_IMPROVE_CLOUD_MODEL` | `deepseek/deepseek-v4-flash` | Cloud model used by hard-prompt routing |
 | `OLLAMA_IMPROVE_CACHE_TTL` | `300.0` | Finite seconds; `0` or a negative value disables caching |
+| `OLLAMA_IMPROVE_CACHE_MAX_ENTRIES` | `500` | Positive maximum JSON cache entries |
 | `OLLAMA_IMPROVE_REWRITE_THRESHOLD` | `260` | Positive base-10 character count |
+| `OLLAMA_IMPROVE_DEBUG` | `0` | `1` emits routing diagnostics and metrics to stderr |
+| `OLLAMA_IMPROVE_METRICS` | `0` | `1` emits per-invocation counters to stderr |
+| `OLLAMA_IMPROVE_METRICS_PERSIST` | `0` | `1` appends counters to a locked JSONL file |
+| `OLLAMA_IMPROVE_METRICS_DIR` | `~/.claude/state/prompt-improve` | Metrics directory when persistence is enabled |
+| `PROMPT_IMPROVE_TARGET_CLI` | detected | Explicit receiving CLI for hook/wrapper use |
+| `PROMPT_IMPROVE_TARGET_MODEL` | detected | Explicit receiving model for hook/wrapper use |
+| `PROMPT_IMPROVE_SHAPE_BY` | `model` | `model` or `cli` |
 | `OLLAMA_URL` | client default or `http://127.0.0.1:11434` | HTTP loopback URL (`localhost`, `127.0.0.1`, or `::1`) |
+
+Successful cloud-first results use the same project/target-aware cache contract
+as local results. The configured `OLLAMA_IMPROVE_CLOUD_MODEL` is part of that
+route's key, so changing provider/model never reuses the prior cloud output.
 
 ## Target profiles
 
@@ -115,13 +143,17 @@ so failure can still reach deterministic rules instead of being killed mid-call.
 ```bash
 prompt-improve detect --prompt "fix foo.py"
 prompt-improve classify --prompt "audit the auth design" --mode rewrite
-prompt-improve target
-prompt-improve improve --prompt "continua" --cwd "$PWD"
+prompt-improve target --cli codex --model gpt-5.6-sol
+prompt-improve improve --prompt "continua" --cwd "$PWD" \
+  --cli codex --model gpt-5.6-sol
 ```
 
 The installed command and `python -m prompt_improve.cli` share the same
 subcommands. `improve` uses the hook's deterministic continuation and
 rewrite→clarify fallback path rather than a separate approximation.
+Each explicit `--cli`/`--model` diagnostic argument wins over its corresponding
+inherited target variable; model identity still outranks CLI family. Hook
+payloads retain the normal environment-first precedence used by wrappers.
 
 ### Architecture (`features/target/`)
 
@@ -145,3 +177,9 @@ On Ubuntu with a systemd-managed Ollama unit the hook starts the daemon via
 tags are missing excludes embedding-only models (`nomic-embed-*`, `bge-*`,
 `embedding*`) so a miss does not burn the 20s wall-clock budget on a non-chat
 tag.
+
+The session-start warmup can be disabled with `PROMPT_IMPROVER_WARMUP=0`; model
+preloading alone can be disabled with `PROMPT_IMPROVER_PRELOAD=0`, and
+`OLLAMA_IMPROVE_WARM_MODEL` overrides the preloaded tag. The live Claude/Codex
+warmup and prompt shim are symlinked to this repository, so the tracked scripts
+remain the single source of truth.

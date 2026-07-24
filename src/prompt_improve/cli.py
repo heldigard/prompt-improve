@@ -42,7 +42,11 @@ def _cmd_improve(args: argparse.Namespace) -> int:
 
     prompt = args.prompt
     cwd = args.cwd
-    data: dict | None = {"prompt": prompt, "cwd": cwd} if cwd else {"prompt": prompt}
+    data: dict[str, object] = {"prompt": prompt, "cwd": cwd} if cwd else {"prompt": prompt}
+    if args.cli:
+        data["cli"] = args.cli
+    if args.model:
+        data["model"] = args.model
 
     try:
         if detect_trivial(prompt):
@@ -60,7 +64,7 @@ def _cmd_improve(args: argparse.Namespace) -> int:
             return 0
 
         mode = args.mode or decide_mode(prompt)
-        target = target_profile_from_request(data)
+        target = target_profile_from_request(data, prefer_payload=True)
         improved, source, effective_mode = _try_improve(prompt, mode, cwd, target)
         if not improved:
             metrics.record("passthrough:noimprove")
@@ -115,7 +119,10 @@ def _cmd_detect(args: argparse.Namespace) -> int:
 def _cmd_target(args: argparse.Namespace) -> int:
     from prompt_improve.features.target import target_profile_from_request
 
-    profile = target_profile_from_request()
+    payload = {
+        key: value for key, value in (("cli", args.cli), ("model", args.model)) if value is not None
+    }
+    profile = target_profile_from_request(payload or None, prefer_payload=True)
     print(json.dumps(profile, default=lambda o: getattr(o, "__dict__", str(o)), indent=2))
     return 0
 
@@ -132,6 +139,8 @@ def main(argv: list[str] | None = None) -> int:
     pi.add_argument("--prompt", required=True)
     pi.add_argument("--mode", choices=("rewrite", "clarify"), help="override OLLAMA_IMPROVE_MODE")
     pi.add_argument("--cwd", help="project cwd for hint resolution")
+    pi.add_argument("--cli", help="receiving CLI override (for target-aware shaping)")
+    pi.add_argument("--model", help="receiving model override (takes precedence over CLI family)")
     pi.set_defaults(func=_cmd_improve)
 
     pc = sub.add_parser("classify", help="cloud-intelligence decision for one prompt")
@@ -144,6 +153,8 @@ def main(argv: list[str] | None = None) -> int:
     pd.set_defaults(func=_cmd_detect)
 
     pt = sub.add_parser("target", help="resolved target profile (CLI / model family)")
+    pt.add_argument("--cli", help="receiving CLI override")
+    pt.add_argument("--model", help="receiving model override (takes precedence over CLI family)")
     pt.set_defaults(func=_cmd_target)
 
     args = p.parse_args(argv)

@@ -115,9 +115,15 @@ def _variant_guidance(target: TargetProfile) -> str:
             )
         if "v4" in lower:
             return (
-                "Version note: DeepSeek V4 is strong for coding and agentic reasoning; "
-                "keep externally visible steps numbered, specify the final answer "
-                "contract, and do not request hidden chain-of-thought."
+                "Version note: DeepSeek V4 is an instruct/agentic model. Use normal "
+                "instruction hierarchy, keep externally visible steps numbered when "
+                "order matters, specify the final-answer contract, and do not request "
+                "hidden chain-of-thought."
+            )
+        if "v3" in lower or "chat" in lower:
+            return (
+                "Version note: DeepSeek V3/chat is an instruct model. Use the normal "
+                "system/user instruction hierarchy and define the final-answer contract."
             )
     if target.family == "qwen" and ("qwen3" in lower or "qwen-3" in lower):
         return (
@@ -237,17 +243,18 @@ SHAPES: dict[str, FamilyShape] = {
     "deepseek": FamilyShape(
         family="deepseek",
         rewrite=(
-            "Target model profile: DeepSeek. Use numbered deterministic steps; "
-            "DeepSeek is a reasoning model and yields better output when visible "
-            "sub-steps and final-answer contracts are explicit."
+            "Target model profile: DeepSeek. Use a concise, self-contained prompt "
+            "with an explicit final-answer contract. Number externally visible "
+            "steps only when their order is part of the requested output."
         ),
         clarify=(
-            "Target model profile: DeepSeek. Number the visible steps and define the final answer."
+            "Target model profile: DeepSeek. Keep the request self-contained and "
+            "define the observable final answer."
         ),
         behavior=(
-            "Mitigation: DeepSeek is a reasoning model — give it numbered "
-            "deterministic steps, but do not request hidden chain-of-thought or "
-            "over-constrain intermediate reasoning output."
+            "Mitigation: specify observable evidence and the final-answer contract, "
+            "but do not request hidden chain-of-thought or over-constrain internal "
+            "reasoning."
         ),
     ),
     "glm": FamilyShape(

@@ -11,7 +11,7 @@ from tests._helpers import (  # noqa: F401
 )
 
 
-def test_route_hard_prompt_prefers_cloud():
+def test_route_hard_prompt_prefers_cloud(monkeypatch):
     """When needs_cloud_intelligence is True, the cloud cascade is called and local
     is NOT (the bigger model handles it)."""
     import prompt_improve.features.improve as m
@@ -22,6 +22,8 @@ def test_route_hard_prompt_prefers_cloud():
     orig_cloud = m.call_cloud_cascade
     orig_local = m.call_ollama_rewrite
     m.needs_cloud_intelligence = lambda _p, _mode: True
+    monkeypatch.setattr(m, "load_cached", lambda *_args, **_kwargs: None)
+    monkeypatch.setattr(m, "save_cached", lambda *_args, **_kwargs: None)
 
     def cloud(_p, _mode, _cwd=None, cloud_model=None, target=None, deadline=None):
         captured["cloud_model"] = cloud_model
@@ -134,6 +136,8 @@ def test_route_hard_prompt_cloud_model_env_override(monkeypatch):
     orig_cloud = m.call_cloud_cascade
     m.needs_cloud_intelligence = lambda _p, _mode: True
     monkeypatch.setenv("OLLAMA_IMPROVE_CLOUD_MODEL", "openai/gpt-5.6-mini")
+    monkeypatch.setattr(m, "load_cached", lambda *_args, **_kwargs: None)
+    monkeypatch.setattr(m, "save_cached", lambda *_args, **_kwargs: None)
 
     def cloud(_p, _mode, _cwd=None, cloud_model=None, target=None, deadline=None):
         captured["cloud_model"] = cloud_model
@@ -147,3 +151,75 @@ def test_route_hard_prompt_cloud_model_env_override(monkeypatch):
     finally:
         m.needs_cloud_intelligence = orig_needs
         m.call_cloud_cascade = orig_cloud
+
+
+def test_route_hard_prompt_caches_successful_cloud_result(monkeypatch, tmp_path):
+    """Cloud-first routing must share the normal target/mode cache.
+
+    Without this route-level save, repeated hard prompts always paid for a new
+    cloud call because only the local-first helpers owned cache persistence.
+    """
+    import prompt_improve.features.improve as m
+    import prompt_improve.shared.cache as cache_mod
+
+    (tmp_path / ".memory-bank").mkdir()
+    monkeypatch.setattr(cache_mod, "CACHE_DIR", tmp_path / "cache")
+    monkeypatch.setattr(cache_mod, "CACHE_TTL_SECONDS", 300.0)
+    monkeypatch.setattr(m, "needs_cloud_intelligence", lambda _p, _mode: True)
+    calls = 0
+
+    def cloud(_p, _mode, _cwd=None, cloud_model=None, target=None, deadline=None):
+        nonlocal calls
+        calls += 1
+        return ("CLOUD-CACHED", "cloud:deepseek-v4-flash")
+
+    monkeypatch.setattr(m, "call_cloud_cascade", cloud)
+    monkeypatch.setattr(
+        m,
+        "call_ollama_rewrite",
+        lambda *_args, **_kwargs: __import__("pytest").fail("local must not run"),
+    )
+
+    kwargs = {
+        "prompt": "audit this architecture for security risks",
+        "mode": "rewrite",
+        "cwd": str(tmp_path),
+        "target": m.GENERIC_TARGET,
+    }
+    assert m.route_and_improve(**kwargs) == (
+        "CLOUD-CACHED",
+        "cloud:deepseek-v4-flash",
+    )
+    assert m.route_and_improve(**kwargs) == (
+        "CLOUD-CACHED",
+        "cloud:deepseek-v4-flash",
+    )
+    assert calls == 1
+
+
+def test_route_cloud_opt_out_does_not_reuse_cloud_cache(monkeypatch):
+    """Disabling cloud must also ignore a previously persisted cloud result."""
+    import prompt_improve.features.improve as m
+
+    monkeypatch.setattr(m, "needs_cloud_intelligence", lambda _p, _mode: True)
+    monkeypatch.setattr(m, "CLOUD_FALLBACK", False)
+    monkeypatch.setattr(
+        m,
+        "load_cached",
+        lambda *_args, **_kwargs: __import__("pytest").fail(
+            "cloud cache must not be read while cloud is disabled"
+        ),
+    )
+    monkeypatch.setattr(m, "call_cloud_cascade", lambda *_args, **_kwargs: None)
+    monkeypatch.setattr(
+        m,
+        "call_ollama_rewrite",
+        lambda *_args, **_kwargs: ("LOCAL", "ollama:test"),
+    )
+
+    assert m.route_and_improve(
+        "audit this architecture for security risks",
+        "rewrite",
+        None,
+        target=m.GENERIC_TARGET,
+    ) == ("LOCAL", "ollama:test")

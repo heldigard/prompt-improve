@@ -1,5 +1,12 @@
 # Progress
 
+## 2026-07-23
+- **v17.3.0**: cloud-first cache with configured-model partition and cloud opt-out semantics.
+- Diagnostics: explicit target flags with payload-first CLI precedence; DeepSeek lineage guidance corrected.
+- Packaging: Python 3.14 metadata/CI, self-contained test extra, MIT license, wheel install smoke.
+- Documentation/memory: full runtime env surface, real architecture map, refreshed codeq symbol map.
+- Validation: 272 passed, 1 live Ollama smoke skipped, 84.43% coverage; Ruff, mypy, shellcheck, codescan, build, wheel smoke green.
+
 ## 2026-07-19
 - CLI: `--help` documents improve/detect/classify/target; `SystemExit` propagates subcommand exit codes.
 - Tests: split former `test_improve` monolith into routing/cascade/role_model/fallback/messages + `_helpers` (incl. `_FAKE_REWRITE`).

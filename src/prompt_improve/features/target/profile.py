@@ -45,31 +45,45 @@ GENERIC_TARGET = TargetProfile(
 )
 
 
-def target_profile_from_request(data: dict | None = None) -> TargetProfile:
+def target_profile_from_request(
+    data: dict | None = None,
+    *,
+    prefer_payload: bool = False,
+) -> TargetProfile:
     """Infer target CLI/model from hook payload and environment.
 
     Explicit env overrides are first-class because shell wrappers know more than
-    hook payloads in proxied Claude Code and Codex profile launches.
+    hook payloads in proxied Claude Code and Codex profile launches. Diagnostic
+    CLI flags set ``prefer_payload`` so an explicit command-line choice wins over
+    inherited shell state without changing hook precedence.
     """
     data = data or {}
-    cli = _first_text(
+    env_cli = _first_text(
         os.environ.get("PROMPT_IMPROVE_TARGET_CLI"),
         os.environ.get("CODEX_TARGET_CLI"),
         os.environ.get("CLAUDE_TARGET_CLI"),
         os.environ.get("CLI_ORCHESTRATION_CALLER"),
+    )
+    payload_cli = _first_text(
         data.get("cli"),
         data.get("client"),
         data.get("tool"),
         data.get("app"),
     )
+    cli = _first_text(payload_cli, env_cli) if prefer_payload else _first_text(env_cli, payload_cli)
     if not cli:
         cli = _cli_from_payload(data)
-    model = _first_text(
+    env_model = _first_text(
         os.environ.get("PROMPT_IMPROVE_TARGET_MODEL"),
-        _model_from_payload(data),
         _model_from_env(),
         os.environ.get("ANTHROPIC_MODEL"),
         _model_from_agent_identity(os.environ.get("CLAUDE_AGENT_IDENTITY")),
+    )
+    payload_model = _model_from_payload(data)
+    model = (
+        _first_text(payload_model, env_model)
+        if prefer_payload
+        else _first_text(env_model, payload_model)
     )
 
     if not cli:

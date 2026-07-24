@@ -4,11 +4,12 @@ build-backend = "hatchling.build"
 
 [project]
 name = "prompt-improve"
-version = "17.2.0"
-description = "LLM-powered prompt improvement hook for Claude Code (Ollama-local, cloud fallback)."
+version = "17.3.0"
+description = "Target-aware prompt improvement hook for agentic CLIs (local Ollama, cloud fallback)."
 readme = "README.md"
 requires-python = ">=3.11"
-license = { text = "MIT" }
+license = "MIT"
+license-files = ["LICENSE"]
 authors = [{ name = "heldigard" }]
 keywords = ["claude-code", "hook", "prompt-improvement", "ollama", "llm-agents"]
 classifiers = [
@@ -20,12 +21,13 @@ classifiers = [
   "Programming Language :: Python :: 3.11",
   "Programming Language :: Python :: 3.12",
   "Programming Language :: Python :: 3.13",
+  "Programming Language :: Python :: 3.14",
   "Topic :: Text Processing :: General",
 ]
 dependencies = []
 
 [project.optional-dependencies]
-test = ["pytest>=8", "pytest-cov>=5", "ruff>=0.6"]
+test = ["build>=1.2", "mypy>=1.15", "pytest>=8", "pytest-cov>=5", "ruff>=0.6"]
 
 [project.scripts]
 prompt-improve = "prompt_improve.command:main"

@@ -28,10 +28,10 @@ Source of truth: `shared/config.py::_DEFAULT_IMPROVE_CHAIN` and `~/ollama-bench/
 
 ## Commands
 ```bash
-pip install -e ~/prompt-improve
-cd ~/prompt-improve && .venv/bin/python -m pytest tests/ -q
+uv tool install --force --editable ~/prompt-improve
+cd ~/prompt-improve && .venv/bin/pytest
 prompt-improve detect --prompt "fix foo.py"
-prompt-improve target   # under Grok: family=grok
+prompt-improve target --cli codex --model gpt-5.6-sol
 ```
 
 ## Key env
@@ -40,6 +40,7 @@ prompt-improve target   # under Grok: family=grok
 | `OLLAMA_IMPROVE_TOTAL_TIMEOUT` | Shared wall budget (default 20s) |
 | `OLLAMA_IMPROVE_TIMEOUT` | Per primary attempt (default 45s) |
 | `OLLAMA_IMPROVE_CACHE_TTL` / `CACHE_MAX_ENTRIES` | Cache TTL + size cap |
+| `OLLAMA_IMPROVE_CLOUD_MODEL` | Hard-route model; included in its cache key |
 | `PROMPT_IMPROVE_TARGET_CLI` / `_MODEL` | Explicit target override |
 | `PROMPT_IMPROVE_SHAPE_BY` | `model` (default) \| `cli` |
 | `GROK_AGENT` / `GROK_MODEL` / `XAI_MODEL` | Grok Build detection |
@@ -47,3 +48,4 @@ prompt-improve target   # under Grok: family=grok
 
 ## Related
 - `~/codeq/`, `~/smart-trim/`, `~/ollama-bench/`
+- Architecture: `topics/code-architecture.md`; current symbols: `topics/code-map.md`
